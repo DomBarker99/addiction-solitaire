@@ -9,8 +9,8 @@
  */
 
 :root {
-  --felt-light: #1f4f96; /* navy felt */
-  --felt-dark: #0a2452;
+  --felt-light: #158c4c;
+  --felt-dark: #0b5530;
   --card: #fffdf7;
   --red: #c41e3a;
   --black: #1d1d1f;
@@ -286,7 +286,7 @@ body[data-status='stuck'] #shuffle {
   padding: 22px 20px 18px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 18px;
-  background: #0b2a5c;
+  background: #0d3f25;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
   text-align: center;
 }
