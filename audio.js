@@ -24,13 +24,18 @@
   const raw = {}; // clip name -> downloaded file data, fetched straight away
   const decoded = {}; // clip name -> sounds ready to play
 
-  // Download the clips now (no sound needs to play for that).
+  // Download the clips now (no sound needs to play for that). A page opened
+  // straight from a file (file://) isn't allowed to download them, so it skips
+  // this and uses plain <audio> tags instead (see playWithAudioTag).
+  const canDownload = location.protocol !== 'file:';
   for (const [name, clip] of Object.entries(CLIPS)) {
     raw[name] = Promise.all(
       clip.files.map((file) =>
-        fetch(file)
-          .then((response) => (response.ok ? response.arrayBuffer() : null))
-          .catch(() => null), // e.g. opened as a file on the Mac: falls back to <audio> below
+        canDownload
+          ? fetch(file)
+              .then((response) => (response.ok ? response.arrayBuffer() : null))
+              .catch(() => null)
+          : null,
       ),
     );
   }

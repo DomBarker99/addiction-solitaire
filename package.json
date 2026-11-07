@@ -1,0 +1,17 @@
+{
+  "name": "addiction-solitaire",
+  "private": true,
+  "description": "Addiction Solitaire laid out to play with the phone held upright. Installable web app.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "npm run test:rules && npm run test:browser",
+    "test:rules": "node --test tests/game.test.js",
+    "test:browser": "node tests/e2e.js",
+    "test:live": "node tests/e2e.js https://dombarker99.github.io/addiction-solitaire/"
+  },
+  "devDependencies": {
+    "playwright-core": "1.65.0"
+  }
+}
