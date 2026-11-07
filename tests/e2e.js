@@ -372,9 +372,12 @@ async function freshPage(browser, device, forced, opts = {}) {
         mv = await findMove(page);
       }
       assert.ok(mv, 'found a deal with a normal move');
-      // Wrong place first: drop it on its own column's top slot (not its gap).
+      // Wrong place first: the same row one or two columns over (never its own slot
+      // or its gap, so the finger really moves and it's a drag, not a tap).
       const start = await center(page, `.card[data-card="${mv.card}"]`);
-      const wrong = await center(page, `.slot[data-slot="${mv.to === 0 ? 13 : 0}"]`);
+      const wrongSlot = [(mv.from + 13) % 52, (mv.from + 26) % 52].find((s) => s !== mv.to);
+      const wrong = await center(page, `.slot[data-slot="${wrongSlot}"]`);
+      assert.ok(Math.hypot(wrong.x - start.x, wrong.y - start.y) > 40, 'the wrong drop is a real drag');
       await touchDrag(start, wrong);
       await wait(page, 400);
       assert.equal(await cardSlot(page, mv.card), mv.from, 'slid back');
