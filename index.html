@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Addiction Solitaire</title>
+    <meta name="description" content="Addiction Solitaire, laid out to play with the phone held upright." />
+    <meta name="theme-color" content="#0b5530" />
+
+    <!-- Makes it installable: name, icons, full screen, portrait (see manifest.json). -->
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+
+    <!-- iPhone equivalents, because Safari reads only part of manifest.json. -->
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Addiction" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- Suit shapes, defined once and reused by every card. -->
+    <svg class="sprites" aria-hidden="true">
+      <symbol id="suit-spades" viewBox="0 0 100 100">
+        <path d="M50 5C44 20 8 41 8 62c0 14 11 22 22 22 8 0 14-4 17-9-1 9-5 15-13 20h32c-8-5-12-11-13-20 3 5 9 9 17 9 11 0 22-8 22-22C92 41 56 20 50 5Z" />
+      </symbol>
+      <symbol id="suit-hearts" viewBox="0 0 100 100">
+        <path d="M50 90C46 86 9 61 5 37 2 19 14 7 29 7c10 0 17 6 21 15 4-9 11-15 21-15 15 0 27 12 24 30C91 61 54 86 50 90Z" />
+      </symbol>
+      <symbol id="suit-diamonds" viewBox="0 0 100 100">
+        <path d="M50 4c9 17 21 32 36 46-15 14-27 29-36 46-9-17-21-32-36-46C29 36 41 21 50 4Z" />
+      </symbol>
+      <symbol id="suit-clubs" viewBox="0 0 100 100">
+        <circle cx="50" cy="27" r="19" />
+        <circle cx="27" cy="57" r="19" />
+        <circle cx="73" cy="57" r="19" />
+        <circle cx="50" cy="50" r="12" />
+        <path d="M47 55c0 18-5 31-13 40h32c-8-9-13-22-13-40Z" />
+      </symbol>
+    </svg>
+
+    <div class="app">
+      <header class="topbar">
+        <span id="status" class="status" aria-live="polite">Addiction Solitaire</span>
+        <span id="shuffles-left" class="shuffles-left">3 shuffles left</span>
+      </header>
+
+      <main id="board" class="board" aria-label="Board"></main>
+
+      <footer class="bottombar">
+        <button id="new-game" class="action" type="button">New game</button>
+        <button id="shuffle" class="action" type="button">Shuffle</button>
+      </footer>
+    </div>
+
+    <div id="overlay" class="overlay" hidden>
+      <div class="panel" role="dialog" aria-modal="true" aria-labelledby="overlay-title">
+        <h2 id="overlay-title"></h2>
+        <p id="overlay-text"></p>
+        <div class="panel-buttons">
+          <button class="action primary" type="button" data-action="new-game">New game</button>
+          <button class="action" type="button" data-action="close">Look at the board</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="rotate-hint">Turn your phone upright to play.</div>
+
+    <script src="game.js"></script>
+    <script src="ui.js"></script>
+  </body>
+</html>
