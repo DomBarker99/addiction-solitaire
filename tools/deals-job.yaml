@@ -1,0 +1,73 @@
+# Runs tools/make-deals.js on the Kubernetes cluster to build the deal bank.
+#
+# From the project folder:
+#   kubectl apply -f tools/deals-job.yaml --selector=step=namespace
+#   kubectl -n addiction-deals create configmap deals-code \
+#     --from-file=game.js --from-file=tools/make-deals.js
+#   kubectl apply -f tools/deals-job.yaml --selector=step=job
+#   kubectl -n addiction-deals logs -f job/make-deals > deals-raw.jsonl
+#
+# Each winnable deal is one JSON line on stdout; progress goes to stderr.
+# Clean up afterwards with: kubectl delete namespace addiction-deals
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: addiction-deals
+  labels:
+    step: namespace
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: make-deals
+  namespace: addiction-deals
+  labels:
+    step: job
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: solver
+          image: node:26-alpine
+          command:
+            - node
+            - /app/make-deals.js
+            - --from
+            - "1"
+            - --to
+            - "20000"
+            - --workers
+            - "62"
+            - --budget
+            - "2000000"
+          env:
+            - name: GAME_JS
+              value: /app/game.js
+          resources:
+            # Reserve most of the 64-core worker; no CPU cap, so it also uses any
+            # idle cores while other services keep the share they reserved.
+            requests:
+              cpu: "50"
+              memory: 8Gi
+            limits:
+              memory: 16Gi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: code
+              mountPath: /app
+              readOnly: true
+      volumes:
+        - name: code
+          configMap:
+            name: deals-code

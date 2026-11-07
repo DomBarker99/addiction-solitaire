@@ -19,6 +19,11 @@
  * The classic game draws each line as a row. ui.js draws each line as a column
  * instead, so the board fits a phone held upright. The rules don't change,
  * only the direction: "the card before the gap" is the card above it.
+ *
+ * Deals are numbered: dealFromSeed(n) always produces the same layout, on every
+ * phone. deals.js lists deal numbers that a solver has proven can be won without
+ * a single shuffle (see tools/make-deals.js). A deal's shuffles are numbered too,
+ * so undoing a shuffle and shuffling again gives the same result.
  */
 (function (root) {
   'use strict';
@@ -58,14 +63,42 @@
     return items;
   }
 
+  // Small, fast pseudo-random generator (mulberry32). The same seed gives the
+  // same sequence of numbers on every device, which is what makes deal numbers work.
+  // Changing this (or shuffleArray) would change every numbered deal and break deals.js.
+  function seededRandom(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // Combines two numbers into one seed (used for "deal n, shuffle k").
+  const mixSeeds = (a, b) =>
+    (Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul((b + 0x632be5ab) | 0, 0xc2b2ae35)) >>> 0;
+
   // A fresh game. `board` has one entry per slot: a card, or null for a gap.
+  // `history` is what Undo walks back through.
   function newGame(random = Math.random) {
     const deck = shuffleArray([...Array(SLOT_COUNT).keys()], random);
     return {
       board: deck.map((card) => (rankOf(card) === 1 ? null : card)),
       shufflesLeft: SHUFFLES_PER_GAME,
       moves: 0,
+      seed: null,
+      history: [],
     };
+  }
+
+  // Deal number `seed`: always the same layout.
+  function dealFromSeed(seed) {
+    const state = newGame(seededRandom(seed));
+    state.seed = seed;
+    return state;
   }
 
   // Is `card` the one that comes right after `prev` (same suit, one rank up)?
@@ -129,6 +162,7 @@
     state.board[from] = null;
     state.board[slot] = card;
     state.moves++;
+    (state.history ||= []).push({ card, from, to: slot });
     return { card, from, to: slot };
   }
 
@@ -143,9 +177,18 @@
     });
   }
 
+  // The random numbers for this game's next shuffle. For a numbered deal they
+  // depend only on the deal and which shuffle it is (1st, 2nd, 3rd).
+  function shuffleRandom(state) {
+    if (state.seed == null) return Math.random;
+    const shuffleNumber = SHUFFLES_PER_GAME - state.shufflesLeft + 1;
+    return seededRandom(mixSeeds(state.seed, shuffleNumber));
+  }
+
   // Uses up one shuffle. Returns false if there are none left.
-  function shuffle(state, random = Math.random) {
+  function shuffle(state, random = shuffleRandom(state)) {
     if (state.shufflesLeft <= 0) return false;
+    (state.history ||= []).push({ board: state.board.slice() });
     const locked = lockedSlots(state.board);
     const open = [];
     for (let slot = 0; slot < SLOT_COUNT; slot++) if (!locked[slot]) open.push(slot);
@@ -160,11 +203,56 @@
     return true;
   }
 
+  // Takes back the last move or shuffle. Returns what was undone (a move looks
+  // like { card, from, to }; a shuffle like { board }), or null if there is nothing to undo.
+  function undo(state) {
+    const last = state.history && state.history.pop();
+    if (!last) return null;
+    if (last.board) {
+      state.board = last.board.slice();
+      state.shufflesLeft++;
+    } else {
+      state.board[last.to] = null;
+      state.board[last.from] = last.card;
+    }
+    state.moves--;
+    return last;
+  }
+
   // 'won', 'playing', 'stuck' (no moves, but shuffles left) or 'lost'.
   function status(state) {
     if (isWon(state.board)) return 'won';
     if (hasMoves(state.board)) return 'playing';
     return state.shufflesLeft > 0 ? 'stuck' : 'lost';
+  }
+
+  // Checks a board: 48 different cards (no Aces) and 4 gaps.
+  function isValidBoard(board) {
+    if (!Array.isArray(board) || board.length !== SLOT_COUNT) return false;
+    const cards = board.filter((c) => c !== null);
+    return (
+      cards.length === CARDS_IN_PLAY &&
+      new Set(cards).size === CARDS_IN_PLAY &&
+      cards.every((c) => Number.isInteger(c) && c >= 0 && c < SLOT_COUNT && rankOf(c) !== 1)
+    );
+  }
+
+  // Rebuilds a game from saved data, or returns null if the data doesn't make sense.
+  function restore(saved) {
+    if (!saved || !isValidBoard(saved.board)) return null;
+    const { shufflesLeft, moves, seed, history } = saved;
+    if (!Number.isInteger(shufflesLeft) || shufflesLeft < 0 || shufflesLeft > SHUFFLES_PER_GAME) return null;
+    if (!Array.isArray(history) || !Number.isInteger(moves)) return null;
+    const okEntry = (h) =>
+      h && (h.board ? isValidBoard(h.board) : [h.card, h.from, h.to].every(Number.isInteger));
+    if (!history.every(okEntry)) return null;
+    return {
+      board: saved.board.slice(),
+      shufflesLeft,
+      moves,
+      seed: Number.isInteger(seed) ? seed : null,
+      history: history.map((h) => (h.board ? { board: h.board.slice() } : { card: h.card, from: h.from, to: h.to })),
+    };
   }
 
   const api = {
@@ -180,7 +268,9 @@
     cardName,
     lineOf,
     posOf,
+    seededRandom,
     newGame,
+    dealFromSeed,
     inPlaceCount,
     lockedSlots,
     cardsInPlace,
@@ -189,7 +279,10 @@
     move,
     hasMoves,
     shuffle,
+    undo,
     status,
+    isValidBoard,
+    restore,
   };
 
   if (typeof module === 'object' && module.exports) module.exports = api; // for tests in Node

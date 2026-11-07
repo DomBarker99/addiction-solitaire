@@ -68,13 +68,40 @@ body {
 .topbar {
   flex: none;
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 14px 8px;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 4px;
+}
+
+.icon-button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: #fff;
+  cursor: pointer;
+}
+
+.icon-button:active {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.icon-button svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
 }
 
 .status {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -88,10 +115,16 @@ body[data-status='stuck'] .status {
   color: var(--accent);
 }
 
-.shuffles-left {
+.timer {
   flex: none;
-  font-size: 14px;
-  opacity: 0.8;
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+
+.timer[hidden] {
+  display: none;
 }
 
 /* ---------- Board ---------- */
@@ -153,11 +186,24 @@ body[data-status='stuck'] .status {
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
+  touch-action: none; /* lets a finger drag the card instead of scrolling */
   transition: transform 190ms cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
 .card.lifted {
   z-index: 3; /* slide over the other cards, not under them */
+}
+
+/* Following a finger: no slide delay, drawn above everything, slightly raised. */
+.card.dragging {
+  z-index: 5;
+  transition: none;
+  cursor: grabbing;
+}
+
+.card.dragging .face {
+  transform: scale(1.06);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
 }
 
 .card .face {
@@ -220,6 +266,11 @@ body[data-status='stuck'] .status {
   animation-delay: calc(var(--row) * 45ms + var(--col) * 25ms);
 }
 
+/* Paused: the board is hidden so the clock can't be beaten by thinking. */
+body.paused .board {
+  visibility: hidden;
+}
+
 /* ---------- Bottom bar ---------- */
 
 .bottombar {
@@ -231,6 +282,10 @@ body[data-status='stuck'] .status {
 }
 
 .action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   height: 48px;
   padding: 0 12px;
   border: 0;
@@ -243,6 +298,35 @@ body[data-status='stuck'] .status {
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
+}
+
+.action[hidden] {
+  display: none;
+}
+
+.button-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Shuffles left, as a little badge on the Shuffle button. */
+.count {
+  min-width: 24px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.action.confirming .count {
+  display: none;
 }
 
 .action:active {
@@ -327,6 +411,156 @@ body[data-status='stuck'] #shuffle {
   }
 }
 
+/* ---------- Menu (slides in from the left; the game is paused) ---------- */
+
+.menu {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+}
+
+.menu[hidden] {
+  display: none;
+}
+
+.menu-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 28, 15, 0.6);
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.menu-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(320px, 86vw);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 18px)
+    calc(env(safe-area-inset-left) + 18px);
+  overflow-y: auto;
+  background: #0d3f25;
+  box-shadow: 8px 0 30px rgba(0, 0, 0, 0.45);
+  transform: translateX(-100%);
+  transition: transform 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.menu.open .menu-backdrop {
+  opacity: 1;
+}
+
+.menu.open .menu-panel {
+  transform: none;
+}
+
+.menu-panel h2 {
+  margin: 0 0 4px;
+  font-size: 26px;
+}
+
+.menu-buttons {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+}
+
+.setting-name {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* Off / Wood / Card */
+.segmented {
+  display: flex;
+  padding: 3px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.segmented button {
+  min-width: 58px;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.segmented button[aria-checked='true'] {
+  background: var(--accent);
+  color: var(--black);
+}
+
+/* On / off switch */
+.switch {
+  position: relative;
+  width: 54px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.switch .knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 160ms ease;
+}
+
+.switch[aria-checked='true'] {
+  background: var(--accent);
+}
+
+.switch[aria-checked='true'] .knob {
+  transform: translateX(22px);
+}
+
+.menu-note {
+  margin: auto 0 0;
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+/* ---------- Win celebration layer (celebrate.js) ---------- */
+
+.celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 12;
+  width: 100%;
+  height: 100%;
+  transition: opacity 400ms ease;
+}
+
+.celebration.fade {
+  opacity: 0;
+}
+
 /* ---------- Animations ---------- */
 
 @keyframes shake {
@@ -379,7 +613,9 @@ body[data-status='stuck'] #shuffle {
 
 @media (prefers-reduced-motion: reduce) {
   .card,
-  .board.shuffling .card {
+  .board.shuffling .card,
+  .menu-panel,
+  .menu-backdrop {
     transition-duration: 1ms;
     transition-delay: 0ms;
   }

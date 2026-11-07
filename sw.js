@@ -8,15 +8,27 @@
  *
  * If you add or rename a file, add it to FILES and change VERSION.
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `addiction-${VERSION}`;
 const FILES = [
   './',
   'index.html',
   'style.css',
   'game.js',
+  'deals.js',
+  'audio.js',
+  'celebrate.js',
   'ui.js',
   'manifest.json',
+  'sounds/card-1.wav',
+  'sounds/card-2.wav',
+  'sounds/card-3.wav',
+  'sounds/card-4.wav',
+  'sounds/wood-1.wav',
+  'sounds/wood-2.wav',
+  'sounds/wood-3.wav',
+  'sounds/wood-4.wav',
+  'sounds/riffle.wav',
   'icons/icon.svg',
   'icons/icon-192.png',
   'icons/icon-512.png',

@@ -43,24 +43,64 @@
 
     <div class="app">
       <header class="topbar">
+        <button id="menu-button" class="icon-button" type="button" aria-label="Menu" aria-controls="menu">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16" /></svg>
+        </button>
         <span id="status" class="status" aria-live="polite">Addiction Solitaire</span>
-        <span id="shuffles-left" class="shuffles-left">3 shuffles left</span>
+        <span id="timer" class="timer" aria-label="Time">0:00</span>
       </header>
 
       <main id="board" class="board" aria-label="Board"></main>
 
       <footer class="bottombar">
-        <button id="new-game" class="action" type="button">New game</button>
-        <button id="shuffle" class="action" type="button">Shuffle</button>
+        <button id="undo" class="action" type="button" disabled>
+          <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5 4 10l5 5M4 10h10.5a5.5 5.5 0 0 1 0 11H11" /></svg>
+          <span class="label">Undo</span>
+        </button>
+        <button id="shuffle" class="action" type="button">
+          <span class="label">Shuffle</span>
+          <span id="shuffles-left" class="count" aria-label="shuffles left">3</span>
+        </button>
       </footer>
     </div>
 
+    <!-- Menu: opening it pauses the game. -->
+    <div id="menu" class="menu" hidden>
+      <div class="menu-backdrop" data-action="resume"></div>
+      <div class="menu-panel" role="dialog" aria-modal="true" aria-labelledby="menu-title">
+        <h2 id="menu-title">Paused</h2>
+        <div class="menu-buttons">
+          <button class="action primary" type="button" data-action="resume">Resume</button>
+          <button id="menu-new-game" class="action" type="button" data-action="new-game">
+            <span class="label">New game</span>
+          </button>
+        </div>
+        <div class="setting">
+          <span id="sound-label" class="setting-name">Sound</span>
+          <div class="segmented" role="radiogroup" aria-labelledby="sound-label">
+            <button type="button" role="radio" data-sound="off">Off</button>
+            <button type="button" role="radio" data-sound="wood">Wood</button>
+            <button type="button" role="radio" data-sound="card">Card</button>
+          </div>
+        </div>
+        <div class="setting">
+          <span id="timer-label" class="setting-name">Timer</span>
+          <button id="timer-switch" class="switch" type="button" role="switch" aria-checked="true" aria-labelledby="timer-label">
+            <span class="knob"></span>
+          </button>
+        </div>
+        <p id="deal-number" class="menu-note"></p>
+      </div>
+    </div>
+
+    <!-- Win / lose panel. -->
     <div id="overlay" class="overlay" hidden>
       <div class="panel" role="dialog" aria-modal="true" aria-labelledby="overlay-title">
         <h2 id="overlay-title"></h2>
         <p id="overlay-text"></p>
         <div class="panel-buttons">
-          <button class="action primary" type="button" data-action="new-game">New game</button>
+          <button id="overlay-undo" class="action primary" type="button" data-action="undo">Undo last move</button>
+          <button id="overlay-new-game" class="action primary" type="button" data-action="new-game">New game</button>
           <button class="action" type="button" data-action="close">Look at the board</button>
         </div>
       </div>
@@ -69,6 +109,9 @@
     <div class="rotate-hint">Turn your phone upright to play.</div>
 
     <script src="game.js"></script>
+    <script src="deals.js"></script>
+    <script src="audio.js"></script>
+    <script src="celebrate.js"></script>
     <script src="ui.js"></script>
   </body>
 </html>
