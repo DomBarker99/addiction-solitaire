@@ -3,14 +3,15 @@
  *   'cascade'  - cards jump off the board one after another and bounce away,
  *                leaving trails, like classic Windows Solitaire.
  *   'confetti' - two bursts of confetti from the bottom corners, then a shower.
- * ui.js alternates between them. A tap skips to the end.
+ * shell.js alternates between them. A tap skips to the end.
+ * Card names and suits come from cards.js, so every game can use this file.
  *
  *   Celebrate.run('cascade', [{ card, el }, ...]).then(() => ...)
  */
 (() => {
   'use strict';
 
-  const G = window.Addiction;
+  const C = window.Cards;
   const STEP = 1000 / 60; // physics runs at 60 steps a second on any screen
 
   // Suit shapes, the same drawings as the sprites in index.html (100x100 box).
@@ -94,12 +95,12 @@
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
     ctx.stroke();
 
-    const suit = G.SUITS[G.suitOf(card)];
+    const suit = C.SUITS[C.suitOf(card)];
     ctx.fillStyle = suit.red ? '#c41e3a' : '#1d1d1f';
     const size = Math.round(Math.min(height * 0.52, width * 0.36));
     ctx.font = `700 ${size}px system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif`;
     ctx.textBaseline = 'middle';
-    const label = G.rankLabel(card);
+    const label = C.rankLabel(card);
     const labelWidth = ctx.measureText(label).width;
     const suitSize = size * 0.9;
     const gap = size * 0.12;
@@ -120,13 +121,18 @@
     const { ctx, width, height, dpr } = layer;
     const scale = height / 800; // so it looks the same on small and big screens
     const gravity = 0.55 * scale;
-    // Kings leave first, then Queens, and so on up the columns.
+    // Kings leave first, then Queens, and so on: in Addiction that's the
+    // bottom row first, then up the columns; in Solitaire, where every pile is
+    // in the same row, one card from each pile in turn.
     const queue = cards
       .map(({ card, el }) => {
         const face = el.querySelector('.face') || el;
         return { card, el, rect: face.getBoundingClientRect() };
       })
-      .sort((a, b) => b.rect.top - a.rect.top || a.rect.left - b.rect.left);
+      .sort(
+        (a, b) =>
+          b.rect.top - a.rect.top || C.rankOf(b.card) - C.rankOf(a.card) || a.rect.left - b.rect.left,
+      );
     const flying = [];
     let tick = 0;
 

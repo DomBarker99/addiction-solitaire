@@ -8,12 +8,15 @@
  *
  * If you add or rename a file, add it to FILES and change VERSION.
  */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = `addiction-${VERSION}`;
 const FILES = [
   './',
   'index.html',
   'style.css',
+  'addiction.css',
+  'shell.js',
+  'cards.js',
   'game.js',
   'deals.js',
   'audio.js',
@@ -46,12 +49,18 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Throw away copies saved by older versions.
+// Throw away copies saved by older versions. Only this app's own copies: all
+// of a GitHub account's Pages sites share one web address and so one set of
+// saved copies, and another site's offline copy isn't ours to delete.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+      .then((keys) =>
+        Promise.all(
+          keys.filter((key) => key.startsWith('addiction-') && key !== CACHE).map((key) => caches.delete(key)),
+        ),
+      )
       .then(() => self.clients.claim()),
   );
 });

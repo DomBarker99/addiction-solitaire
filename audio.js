@@ -12,10 +12,14 @@
 (() => {
   'use strict';
 
+  // The clips are in sounds/, next to this file. Pages in other folders
+  // (klondike/) load this file too, so the paths start from here, not from the page.
+  const SOUNDS = new URL('sounds/', document.currentScript.src);
+  const clip = (name) => new URL(name, SOUNDS).href;
   const CLIPS = {
-    card: { files: ['sounds/card-1.wav', 'sounds/card-2.wav', 'sounds/card-3.wav', 'sounds/card-4.wav'], volume: 1 },
-    wood: { files: ['sounds/wood-1.wav', 'sounds/wood-2.wav', 'sounds/wood-3.wav', 'sounds/wood-4.wav'], volume: 1 },
-    riffle: { files: ['sounds/riffle.wav'], volume: 0.9 },
+    card: { files: [clip('card-1.wav'), clip('card-2.wav'), clip('card-3.wav'), clip('card-4.wav')], volume: 1 },
+    wood: { files: [clip('wood-1.wav'), clip('wood-2.wav'), clip('wood-3.wav'), clip('wood-4.wav')], volume: 1 },
+    riffle: { files: [clip('riffle.wav')], volume: 0.9 },
   };
 
   let style = 'card'; // 'off', 'wood' or 'card'

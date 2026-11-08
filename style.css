@@ -1,11 +1,10 @@
 /*
- * Layout: top bar, board, bottom bar, filling the screen with nothing to scroll.
+ * The frame every game shares: the felt, the top bar, the board area, the bottom
+ * bar and its buttons, the menu and the win/lose panel, filling the screen with
+ * nothing to scroll.
  *
- * The board is 4 columns by 13 rows. Every slot and card is absolutely
- * positioned and shifted into place with
- *   transform: translate(column * 100%, row * 100%)
- * using the --col and --row variables that ui.js sets. Changing those numbers
- * is all it takes to move a card, and the transition makes it slide.
+ * Each game styles its own cards in its own file: addiction.css for Addiction,
+ * klondike/style.css for Solitaire.
  */
 
 :root {
@@ -138,134 +137,6 @@ body[data-status='stuck'] .status {
   container-type: size;
 }
 
-.slot,
-.card {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 25%;
-  height: calc(100% / 13);
-  transform: translate(calc(var(--col) * 100%), calc(var(--row) * 100%));
-}
-
-.face {
-  position: absolute;
-  inset: 2px 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.12em;
-  border-radius: var(--radius);
-}
-
-/* Empty slots (gaps). */
-.slot .face {
-  border: 2px dashed var(--gap-line);
-  background: rgba(0, 0, 0, 0.1);
-}
-
-/* A slot with a card on it hides its outline, so it can't peek out when the card hops or shakes. */
-.slot.filled .face {
-  visibility: hidden;
-}
-
-.slot.target .face {
-  border: 2px solid var(--accent);
-  background: rgba(255, 213, 74, 0.2);
-  animation: glow 0.9s ease-in-out infinite alternate;
-}
-
-.card {
-  z-index: 1;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  -webkit-appearance: none;
-  appearance: none;
-  touch-action: none; /* lets a finger drag the card instead of scrolling */
-  transition: transform 190ms cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-
-.card.lifted {
-  z-index: 3; /* slide over the other cards, not under them */
-}
-
-/* Following a finger: no slide delay, drawn above everything, slightly raised. */
-.card.dragging {
-  z-index: 5;
-  transition: none;
-  cursor: grabbing;
-}
-
-.card.dragging .face {
-  transform: scale(1.06);
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
-}
-
-.card .face {
-  background: var(--card);
-  box-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.2),
-    0 1px 3px rgba(0, 0, 0, 0.35);
-  font-size: 20px; /* fallback for older browsers */
-  font-size: min(4cqh, 9cqw);
-  font-weight: 700;
-  line-height: 1;
-}
-
-.card.red .face {
-  color: var(--red);
-}
-
-.card.black .face {
-  color: var(--black);
-}
-
-.rank {
-  letter-spacing: -0.03em;
-}
-
-.suit {
-  flex: none;
-  width: 0.9em;
-  height: 0.9em;
-  fill: currentColor;
-}
-
-.card:focus {
-  outline: none;
-}
-
-.card:focus-visible .face {
-  outline: 3px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.card.selected .face {
-  box-shadow:
-    0 0 0 3px var(--accent),
-    0 4px 10px rgba(0, 0, 0, 0.4);
-}
-
-.card.shake .face {
-  animation: shake 320ms ease-in-out;
-}
-
-/* New game / shuffle: slower slide with a little scatter. */
-.board.shuffling .card {
-  transition-duration: 480ms;
-  transition-delay: var(--delay, 0ms);
-}
-
-.board.won .card .face {
-  animation: hop 700ms ease-in-out both;
-  animation-delay: calc(var(--row) * 45ms + var(--col) * 25ms);
-}
-
 /* Paused: the board is hidden so the clock can't be beaten by thinking. */
 body.paused .board {
   visibility: hidden;
@@ -339,14 +210,9 @@ body.paused .board {
 }
 
 .action.primary,
-.action.confirming,
-body[data-status='stuck'] #shuffle {
+.action.confirming {
   background: var(--accent);
   color: var(--black);
-}
-
-body[data-status='stuck'] #shuffle {
-  animation: pulse 1.2s ease-in-out infinite;
 }
 
 /* ---------- Win / lose panel ---------- */
@@ -612,17 +478,9 @@ body[data-status='stuck'] #shuffle {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card,
-  .board.shuffling .card,
   .menu-panel,
   .menu-backdrop {
     transition-duration: 1ms;
     transition-delay: 0ms;
-  }
-  .slot.target .face,
-  .card.shake .face,
-  .board.won .card .face,
-  body[data-status='stuck'] #shuffle {
-    animation: none;
   }
 }
