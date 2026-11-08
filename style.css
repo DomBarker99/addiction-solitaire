@@ -412,6 +412,17 @@ body.paused .board {
   opacity: 0.7;
 }
 
+/* A short explanation under a setting. */
+.menu-hint {
+  margin: -8px 0 0;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.menu-hint[hidden] {
+  display: none;
+}
+
 /* ---------- Win celebration layer (celebrate.js) ---------- */
 
 .celebration {

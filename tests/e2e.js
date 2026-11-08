@@ -1,8 +1,9 @@
 /*
  * Browser tests. Drives the installed Google Chrome pretending to be a Galaxy S26,
- * iPhones, a desktop and a sideways phone, and checks layout, taps, drags, undo,
- * the menu and pause, timer, settings, auto-save, wins, losses, offline mode and
- * installability.
+ * iPhones, a desktop and a sideways phone, and checks both games (Addiction and
+ * Solitaire): layout, taps, drags, undo, the menu and pause, timer, settings,
+ * switching games, auto-save, wins, losses, offline mode, opening straight from
+ * the files, and installability.
  *
  *   npm run test:browser      serves this repo on a random local port and tests it
  *   npm run test:live         tests the published site
@@ -137,6 +138,97 @@ const center = (page, sel) =>
     const r = (el.querySelector('.face') || el).getBoundingClientRect();
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   });
+
+// ---------- Solitaire helpers ----------
+
+const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const kcard = (text) => '♠♥♦♣'.indexOf(text.slice(-1)) * 13 + RANKS.indexOf(text.slice(0, -1)); // '10♥' -> 22
+const kcards = (text) => text.split(' ').filter(Boolean).map(kcard);
+const upTo = (suit, rank) => RANKS.slice(0, rank).map((r) => r + suit).join(' ');
+
+// A whole Solitaire table from a sketch. Columns are written bottom card first,
+// with `hidden` face-down cards at the bottom. Cards the sketch leaves out go face
+// down under the columns that have cards (or into the stock), so all 52 are there.
+function solitaireTable({ stock = '', waste = '', foundations = ['', '', '', ''], columns, hidden, draw = 1, rest = 'columns' }) {
+  const t = { draw, stock: kcards(stock), waste: kcards(waste), foundations: foundations.map(kcards), columns: columns.map(kcards), hidden: hidden.slice(), moves: 0, history: [] };
+  const used = new Set([t.stock, t.waste, ...t.foundations, ...t.columns].flat());
+  const left = [...Array(52).keys()].filter((c) => !used.has(c));
+  const withCards = t.columns.map((column, c) => c).filter((c) => t.columns[c].length);
+  left.forEach((card, i) => {
+    if (rest === 'stock') return t.stock.unshift(card);
+    const c = withCards[i % withCards.length];
+    t.columns[c].unshift(card);
+    t.hidden[c]++;
+  });
+  return t;
+}
+
+// Before the page's scripts: the first Solitaire deal is `table` instead.
+function forceSolitaire(page, table) {
+  return page.addInitScript((table) => {
+    let api;
+    Object.defineProperty(window, 'Klondike', {
+      configurable: true,
+      get: () => api,
+      set(v) {
+        api = v;
+        const real = v.dealFromSeed;
+        let used = false;
+        v.dealFromSeed = (seed, draw) => {
+          if (used) return real(seed, draw);
+          used = true;
+          return { ...JSON.parse(JSON.stringify(table)), seed };
+        };
+      },
+    });
+  }, table);
+}
+
+const solitaireGame = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('klondike-solitaire')).game);
+// Which pile a card is in ('waste', 'f0', 'c3', ...), and whether it's face up.
+const whereIs = (page, card) =>
+  page.evaluate((card) => {
+    const K = window.Klondike;
+    const s = JSON.parse(localStorage.getItem('klondike-solitaire')).game;
+    return { pile: K.find(s, card).pile, up: !document.querySelector(`.card[data-card="${card}"]`).classList.contains('down') };
+  }, card);
+// Taps a card near its top edge: the part that shows when other cards lie on it.
+async function tapTop(page, card) {
+  const box = await page.locator(`.card[data-card="${card}"]`).boundingBox();
+  await page.tap(`.card[data-card="${card}"]`, { position: { x: box.width / 2, y: Math.min(10, box.height / 2) } });
+}
+async function topOf(page, card) {
+  const box = await page.locator(`.card[data-card="${card}"]`).boundingBox();
+  return { x: box.x + box.width / 2, y: box.y + Math.min(10, box.height / 2) };
+}
+async function pileSpot(page, name) {
+  const box = await page.locator(`.spot[data-pile="${name}"]`).boundingBox();
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+async function solitairePage(browser, device, table) {
+  const context = await browser.newContext({ ...device, serviceWorkers: 'block' });
+  const page = await context.newPage();
+  page.errors = [];
+  page.on('console', (m) => m.type() === 'error' && page.errors.push(m.text()));
+  page.on('pageerror', (e) => page.errors.push(e.message));
+  await hooks(page, null);
+  if (table) await forceSolitaire(page, table);
+  await page.goto(BASE + 'klondike/index.html');
+  await wait(page, 300);
+  return { context, page };
+}
+// Drags with a finger, through CDP touch events.
+async function touchDrag(context, page, from, to) {
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: from.x, y: from.y }] });
+  for (let i = 1; i <= 8; i++) {
+    const x = from.x + ((to.x - from.x) * i) / 8;
+    const y = from.y + ((to.y - from.y) * i) / 8;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+}
 
 const results = [];
 async function check(name, fn) {
@@ -488,6 +580,383 @@ async function freshPage(browser, device, forced, opts = {}) {
     });
   }
 
+  // ---------- Solitaire: layout on each screen ----------
+  for (const [name, device] of Object.entries(DEVICES)) {
+    const { context, page } = await solitairePage(browser, device);
+    await page.screenshot({ path: path.join(OUT, `solitaire-${name}.png`) });
+    await check(`solitaire ${name}: no errors`, async () => assert.deepEqual(page.errors, []));
+    if (name === 'phone-sideways') {
+      await check(`solitaire ${name}: "turn upright" hint`, async () => assert.ok(await page.locator('.rotate-hint').isVisible()));
+    } else {
+      const m = await page.evaluate(() => {
+        const r = (sel) => document.querySelector(sel).getBoundingClientRect();
+        const cards = [...document.querySelectorAll('.card')].map((e) => e.getBoundingClientRect());
+        return {
+          scrollH: document.documentElement.scrollHeight,
+          innerH: innerHeight,
+          scrollW: document.documentElement.scrollWidth,
+          innerW: innerWidth,
+          top: Math.min(...cards.map((c) => c.top)),
+          bottom: Math.max(...cards.map((c) => c.bottom)),
+          left: Math.min(...cards.map((c) => c.left)),
+          right: Math.max(...cards.map((c) => c.right)),
+          header: r('.topbar').bottom,
+          footer: r('.bottombar').top,
+          cardW: cards[0].width,
+          font: parseFloat(getComputedStyle(document.querySelector('.corner')).fontSize),
+          status: document.getElementById('status').textContent,
+        };
+      });
+      await check(`solitaire ${name}: fits, nothing scrolls (card ${m.cardW.toFixed(0)}px wide, text ${m.font.toFixed(1)}px)`, async () => {
+        assert.ok(m.scrollH <= m.innerH && m.scrollW <= m.innerW, JSON.stringify(m));
+        assert.ok(m.top >= m.header - 0.5 && m.bottom <= m.footer + 0.5, JSON.stringify(m));
+        assert.ok(m.left >= 0 && m.right <= m.innerW, JSON.stringify(m));
+        assert.ok(m.cardW >= 40 && m.font >= 16, JSON.stringify(m));
+        assert.equal(m.status, 'Solitaire · Draw 1');
+      });
+    }
+    await context.close();
+  }
+
+  // The longest column there can be: 6 face down and a King down to an Ace.
+  {
+    const table = solitaireTable({
+      columns: ['8♦', '9♦', '10♦', 'J♦', 'Q♦', 'K♦', '2♦ 3♦ 4♦ 5♦ 6♦ 7♦ K♠ Q♥ J♠ 10♥ 9♠ 8♥ 7♠ 6♥ 5♠ 4♥ 3♠ 2♥ A♠'],
+      hidden: [0, 0, 0, 0, 0, 0, 6],
+      rest: 'stock',
+    });
+    const { context, page } = await solitairePage(browser, DEVICES['iphone-se'], table);
+    await page.screenshot({ path: path.join(OUT, 'solitaire-long-column.png') });
+    await check('solitaire: the longest possible column still fits on the smallest phone, every card readable', async () => {
+      const m = await page.evaluate(() => {
+        const cards = [...document.querySelectorAll('.card')].map((e) => e.getBoundingClientRect());
+        return { bottom: Math.max(...cards.map((c) => c.bottom)), footer: document.querySelector('.bottombar').getBoundingClientRect().top };
+      });
+      assert.ok(m.bottom <= m.footer + 0.5, JSON.stringify(m));
+      // The 13 face-up cards in the right-hand column: how far apart they are.
+      const steps = await page.evaluate(() => {
+        const els = [...document.querySelectorAll('.card')].filter((e) => !e.classList.contains('down'));
+        const tops = els.map((e) => e.getBoundingClientRect()).filter((r) => r.left > innerWidth * 0.8).map((r) => r.top).sort((a, b) => a - b);
+        return tops.slice(1).map((t, i) => t - tops[i]);
+      });
+      assert.ok(steps.length === 12 && Math.min(...steps) >= 16, `face-up cards ${steps.map((s) => s.toFixed(1)).join(', ')}px apart`);
+      assert.deepEqual(page.errors, []);
+    });
+    await context.close();
+  }
+
+  // ---------- Solitaire: playing ----------
+  {
+    const table = solitaireTable({
+      stock: '3♥ A♥',
+      foundations: ['', '', upTo('♦', 4), 'A♣'],
+      columns: ['K♣', '5♦ 8♠', '9♥', '2♣ 10♦ 9♣', 'J♠', 'Q♥', 'K♦'],
+      hidden: [0, 1, 0, 1, 0, 0, 0],
+    });
+    const { context, page } = await solitairePage(browser, phone, table);
+
+    await check('solitaire: tapping the stock turns a card over, plays a sound and starts the clock', async () => {
+      assert.ok(await page.locator('#undo').isDisabled());
+      await tapTop(page, kcard('A♥'));
+      await wait(page, 300);
+      assert.deepEqual(await whereIs(page, kcard('A♥')), { pile: 'waste', up: true });
+      assert.ok((await sounds(page)).includes('move'));
+      assert.ok(await page.locator('#undo').isEnabled());
+      await wait(page, 1300);
+      assert.notEqual(await text(page, '#timer'), '0:00');
+    });
+
+    await check('solitaire: a tap sends a card home, or onto a column; the card under it turns over', async () => {
+      await tapTop(page, kcard('A♥'));
+      await wait(page, 300);
+      assert.deepEqual(await whereIs(page, kcard('A♥')), { pile: 'f0', up: true });
+      assert.deepEqual(await whereIs(page, kcard('5♦')), { pile: 'c1', up: false });
+      await tapTop(page, kcard('8♠'));
+      await wait(page, 300);
+      assert.equal((await whereIs(page, kcard('8♠'))).pile, 'c2');
+      assert.deepEqual(await whereIs(page, kcard('5♦')), { pile: 'c1', up: true });
+      await tapTop(page, kcard('5♦'));
+      await wait(page, 300);
+      assert.equal((await whereIs(page, kcard('5♦'))).pile, 'f2', 'onto the 4♦');
+    });
+
+    await check('solitaire: undo takes moves back, and turns the card face down again', async () => {
+      await page.tap('#undo');
+      await wait(page, 300);
+      assert.deepEqual(await whereIs(page, kcard('5♦')), { pile: 'c1', up: true });
+      await page.tap('#undo');
+      await wait(page, 400);
+      assert.equal((await whereIs(page, kcard('8♠'))).pile, 'c1');
+      assert.deepEqual(await whereIs(page, kcard('5♦')), { pile: 'c1', up: false });
+      await tapTop(page, kcard('8♠'));
+      await wait(page, 300);
+    });
+
+    await check('solitaire: a card with nowhere to go shakes', async () => {
+      await tapTop(page, kcard('K♣'));
+      assert.ok(await page.locator(`.card[data-card="${kcard('K♣')}"]`).evaluate((el) => el.classList.contains('shake')));
+      assert.equal((await whereIs(page, kcard('K♣'))).pile, 'c0');
+    });
+
+    await check('solitaire: drag a run onto a column; a wrong drop slides back', async () => {
+      await touchDrag(context, page, await topOf(page, kcard('10♦')), await topOf(page, kcard('K♦')));
+      await wait(page, 400);
+      assert.equal((await whereIs(page, kcard('10♦'))).pile, 'c3', 'slid back');
+      await page.screenshot({ path: path.join(OUT, 'solitaire-playing.png') });
+      await touchDrag(context, page, await topOf(page, kcard('10♦')), await topOf(page, kcard('J♠')));
+      await wait(page, 400);
+      assert.equal((await whereIs(page, kcard('10♦'))).pile, 'c4');
+      assert.equal((await whereIs(page, kcard('9♣'))).pile, 'c4', 'the 9♣ came along');
+      assert.deepEqual(await whereIs(page, kcard('2♣')), { pile: 'c3', up: true });
+    });
+
+    await check('solitaire: when the stock runs out, tapping its outline turns the waste back over', async () => {
+      await tapTop(page, kcard('3♥'));
+      await wait(page, 300);
+      assert.equal((await solitaireGame(page)).stock.length, 0);
+      assert.ok(await page.locator('.spot.stock').evaluate((el) => el.classList.contains('recycle')));
+      await page.tap('.spot.stock');
+      await wait(page, 300);
+      const game = await solitaireGame(page);
+      assert.deepEqual([game.stock, game.waste], [[kcard('3♥')], []]);
+    });
+
+    await check('solitaire: Draw 3 starts with the next game, or straight away before the first move', async () => {
+      await page.tap('#menu-button');
+      await wait(page, 300);
+      await page.screenshot({ path: path.join(OUT, 'solitaire-menu.png') });
+      assert.equal(await page.locator('[data-switch="klondike"]').getAttribute('aria-checked'), 'true');
+      assert.equal(await page.locator('[data-draw="1"]').getAttribute('aria-checked'), 'true');
+      await page.tap('[data-draw="3"]');
+      assert.equal(await page.locator('[data-draw="3"]').getAttribute('aria-checked'), 'true');
+      assert.equal(await text(page, '#draw-note'), 'Draw 3 starts with your next game.');
+      assert.equal(await text(page, '#status'), 'Solitaire · Draw 1', 'this game carries on in Draw 1');
+      await page.tap('#menu-new-game');
+      assert.equal(await text(page, '#menu-new-game .label'), 'Tap again to start over');
+      await page.tap('#menu-new-game');
+      await wait(page, 1500);
+      assert.equal(await text(page, '#status'), 'Solitaire · Draw 3');
+      assert.equal(await text(page, '#timer'), '0:00');
+      assert.equal((await solitaireGame(page)).stock.length, 24, 'a real deal this time');
+      await tapTop(page, (await solitaireGame(page)).stock.at(-1));
+      await wait(page, 300);
+      const game = await solitaireGame(page);
+      assert.equal(game.waste.length, 3);
+      const xs = await page.evaluate((waste) => waste.map((c) => document.querySelector(`.card[data-card="${c}"]`).getBoundingClientRect().left), game.waste);
+      assert.ok(xs[0] < xs[1] && xs[1] < xs[2], `fanned left to right, top card last: ${xs}`);
+      await page.screenshot({ path: path.join(OUT, 'solitaire-draw3.png') });
+      await page.tap('#undo');
+      await wait(page, 300);
+      await page.tap('#menu-button');
+      await wait(page, 300);
+      await page.tap('[data-draw="1"]');
+      assert.ok(await page.locator('#draw-note').isHidden());
+      await page.tap('.menu-panel [data-action="resume"]');
+      await wait(page, 300);
+      assert.equal(await text(page, '#status'), 'Solitaire · Draw 1', 'no move yet: Draw 1 straight away');
+    });
+
+    await check('solitaire: a game in progress comes back after a reload, paused, the same', async () => {
+      await tapTop(page, (await solitaireGame(page)).stock.at(-1));
+      await wait(page, 300);
+      const before = await solitaireGame(page);
+      await page.reload();
+      await wait(page, 500);
+      assert.ok(await page.locator('#menu').isVisible(), 'comes back paused');
+      assert.deepEqual(await solitaireGame(page), before);
+      await page.tap('.menu-panel [data-action="resume"]');
+      await wait(page, 300);
+      assert.ok(await page.locator('#undo').isEnabled(), 'undo history survived');
+    });
+
+    await check('solitaire: no page errors while playing', async () => assert.deepEqual(page.errors, []));
+    await context.close();
+  }
+
+  // ---------- Solitaire: Finish and winning ----------
+  {
+    const table = solitaireTable({
+      stock: '9♠',
+      foundations: [upTo('♠', 8), upTo('♥', 9), upTo('♦', 9), upTo('♣', 9)],
+      columns: ['K♠ Q♥ J♠ 10♥', 'K♥ Q♠ J♥ 10♠', 'K♦ Q♣ J♦ 10♣', 'K♣ Q♦ J♣ 10♦', '', '', ''],
+      hidden: [0, 0, 0, 0, 0, 0, 0],
+    });
+    const { context, page } = await solitairePage(browser, phone, table);
+    await check('solitaire: Finish lights up once every card is face up, plays them out, and the win is celebrated', async () => {
+      assert.ok(await page.locator('#finish').isEnabled());
+      assert.ok(await page.locator('#finish').evaluate((el) => el.classList.contains('ready')));
+      await page.screenshot({ path: path.join(OUT, 'solitaire-finish.png') });
+      await page.tap('#finish', { force: true }); // it pulses, so it never holds still for Playwright
+      await page.waitForSelector('canvas.celebration', { timeout: 15000 });
+      await wait(page, 1200);
+      await page.screenshot({ path: path.join(OUT, 'solitaire-win.png') });
+      assert.equal((await solitaireGame(page)).foundations.flat().length, 52);
+      await page.mouse.click(200, 300);
+      await page.waitForSelector('#overlay:not([hidden])', { timeout: 3000 });
+      assert.equal(await text(page, '#overlay-title'), 'You won!');
+      assert.match(await text(page, '#overlay-text'), /^All 52 cards are in place in \d+:\d\d\.$/);
+      assert.ok(await page.locator('#undo').isDisabled());
+      assert.equal(await page.locator('.card[style*="hidden"]').count(), 0, 'cards are back after the cascade');
+      assert.deepEqual(page.errors, []);
+    });
+    await check('solitaire: New game from the win panel deals a fresh game', async () => {
+      await page.tap('#overlay-new-game');
+      await wait(page, 1600);
+      const game = await solitaireGame(page);
+      assert.equal(game.stock.length, 24);
+      assert.equal(game.foundations.flat().length, 0);
+      assert.ok(await page.locator('#overlay').isHidden());
+      assert.ok((await sounds(page)).includes('shuffle'));
+    });
+    await context.close();
+  }
+
+  // ---------- Solitaire: no more moves ----------
+  {
+    // Red cards on top of every column, two black 9s in the stock: once the 10♣
+    // goes on the J♥ there's nothing left to do.
+    const table = solitaireTable({
+      stock: '9♣ 9♠',
+      waste: '10♣',
+      columns: ['A♠ 5♥', 'A♣ 8♦', 'A♥ J♥', 'A♦ 3♥', '2♠ 6♦', '2♣ 4♦', '3♠ 2♥'],
+      hidden: [1, 1, 1, 1, 1, 1, 1],
+    });
+    const { context, page } = await solitairePage(browser, phone, table);
+    await check('solitaire: no more moves: the sad trombone, a panel with Undo, and Undo brings the game back', async () => {
+      await tapTop(page, kcard('10♣'));
+      await page.waitForSelector('#overlay:not([hidden])', { timeout: 3000 });
+      assert.equal(await text(page, '#overlay-title'), 'No more moves');
+      assert.equal(await text(page, '#overlay-text'), 'You had 52 cards left.');
+      assert.ok((await sounds(page)).includes('lose'));
+      await page.screenshot({ path: path.join(OUT, 'solitaire-lost.png') });
+      await page.tap('#overlay-undo');
+      await wait(page, 400);
+      assert.ok(await page.locator('#overlay').isHidden());
+      assert.equal((await whereIs(page, kcard('10♣'))).pile, 'waste');
+      assert.equal(await text(page, '#status'), 'Solitaire · Draw 1');
+      assert.deepEqual(page.errors, []);
+    });
+    await context.close();
+  }
+
+  // ---------- Switching games ----------
+  {
+    const { context, page } = await freshPage(browser, phone);
+    await check('switching: Solitaire from the menu, the app then opens on it, and back to the same Addiction game', async () => {
+      const mv = await findMove(page);
+      await page.tap(`.card[data-card="${mv.card}"]`);
+      await wait(page, 300);
+      const addictionBoard = await readBoard(page);
+      await page.tap('#menu-button');
+      await wait(page, 300);
+      await page.screenshot({ path: path.join(OUT, 'menu-switcher.png') });
+      assert.equal(await page.locator('[data-switch="addiction"]').getAttribute('aria-checked'), 'true');
+      await page.tap('[data-switch="klondike"]');
+      await page.waitForURL(/klondike\/index\.html$/);
+      await wait(page, 400);
+      assert.equal(await page.locator('.card').count(), 52);
+      assert.equal(await text(page, '#status'), 'Solitaire · Draw 1');
+      // The installed app always opens the start page: it goes straight to Solitaire now.
+      await page.goto(BASE, { waitUntil: 'commit' });
+      await page.waitForURL(/klondike\/index\.html$/);
+      await wait(page, 400);
+      await page.tap('#menu-button');
+      await wait(page, 300);
+      await page.tap('[data-switch="addiction"]');
+      await page.waitForURL((url) => !url.pathname.includes('klondike'));
+      await wait(page, 500);
+      assert.deepEqual(await readBoard(page), addictionBoard, 'the Addiction game is still there');
+      assert.ok(await page.locator('#menu').isVisible(), 'and comes back paused');
+      await page.goto(BASE);
+      await wait(page, 400);
+      assert.ok(!page.url().includes('klondike'), 'opens on Addiction again');
+    });
+    await check('switching: sound and timer settings are shared by both games', async () => {
+      await page.tap('[data-sound="wood"]');
+      await page.tap('#timer-switch');
+      await page.tap('[data-switch="klondike"]');
+      await page.waitForURL(/klondike\/index\.html$/);
+      await wait(page, 400);
+      await page.tap('#menu-button');
+      await wait(page, 300);
+      assert.equal(await page.locator('[data-sound="wood"]').getAttribute('aria-checked'), 'true');
+      assert.equal(await page.locator('#timer-switch').getAttribute('aria-checked'), 'false');
+      assert.ok(await page.locator('#timer').isHidden());
+    });
+    await check('switching: no page errors', async () => assert.deepEqual(page.errors, []));
+    await context.close();
+  }
+
+  // ---------- An Addiction game saved before Solitaire existed ----------
+  {
+    const G = require('../game.js');
+    const old = G.dealFromSeed(DEALS[0]);
+    const card = old.board.find((c) => c !== null && G.rankOf(c) !== 2 && G.targetsFor(old.board, c).length === 1);
+    G.move(old, card, G.targetsFor(old.board, card)[0]);
+    const v1 = { version: 1, game: old, clock: 61000, settings: { sound: 'wood', timer: false }, dealOrder: { seed: 12345, next: 1 }, nextCelebration: 'confetti' };
+    const context = await browser.newContext({ ...phone, serviceWorkers: 'block' });
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.addInitScript((v1) => {
+      if (!localStorage.getItem('solitaire-settings')) localStorage.setItem('addiction-solitaire', JSON.stringify(v1));
+    }, v1);
+    await page.goto(BASE);
+    await wait(page, 400);
+    await check('an Addiction game saved by the old version still opens, with its sound and timer settings', async () => {
+      assert.deepEqual(await readBoard(page), old.board);
+      assert.ok(await page.locator('#menu').isVisible(), 'in progress: comes back paused');
+      assert.equal(await page.locator('[data-sound="wood"]').getAttribute('aria-checked'), 'true');
+      assert.ok(await page.locator('#timer').isHidden());
+      const [game, settings] = await page.evaluate(() => [JSON.parse(localStorage.getItem('addiction-solitaire')), JSON.parse(localStorage.getItem('solitaire-settings'))]);
+      assert.equal(game.version, 2);
+      assert.equal(game.settings, undefined);
+      assert.deepEqual(game.dealOrder, v1.dealOrder);
+      assert.equal(game.nextCelebration, 'confetti');
+      assert.equal(game.clock, 61000);
+      assert.equal(settings.sound, 'wood');
+      assert.equal(settings.timer, false);
+      assert.deepEqual(errors, []);
+    });
+    await context.close();
+  }
+
+  // ---------- Opening straight from the files (double-clicking index.html) ----------
+  {
+    const context = await browser.newContext({ ...phone });
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await check('opens straight from the files (file://), and switches games there too', async () => {
+      await page.goto('file://' + path.join(ROOT, 'index.html'));
+      await wait(page, 400);
+      assert.equal(await page.locator('.card').count(), 48);
+      await page.tap('#menu-button');
+      await wait(page, 300);
+      await page.tap('[data-switch="klondike"]');
+      await page.waitForURL(/klondike\/index\.html$/);
+      await wait(page, 400);
+      assert.equal(await page.locator('.card').count(), 52);
+      await tapTop(page, (await solitaireGame(page)).stock.at(-1));
+      await wait(page, 300);
+      assert.equal((await solitaireGame(page)).waste.length, 1);
+      assert.deepEqual(errors, []);
+    });
+    await context.close();
+  }
+
+  await check('every file the pages load is saved for offline use (sw.js FILES)', async () => {
+    const sw = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
+    const files = new Set(sw.match(/const FILES = \[([\s\S]*?)\];/)[1].match(/'[^']+'/g).map((f) => f.slice(1, -1)));
+    for (const pageFile of ['index.html', 'klondike/index.html']) {
+      const html = fs.readFileSync(path.join(ROOT, pageFile), 'utf8');
+      for (const [, ref] of html.matchAll(/(?:src|href)="([^"#]+)"/g)) {
+        const file = path.posix.normalize(path.posix.join(path.posix.dirname(pageFile), ref));
+        assert.ok(files.has(file), `${pageFile} loads ${file}, which isn't in FILES`);
+      }
+    }
+  });
+
   // ---------- Install + offline ----------
   {
     const context = await browser.newContext({ ...phone });
@@ -495,7 +964,7 @@ async function freshPage(browser, device, forced, opts = {}) {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto(BASE);
-    await check('service worker installs, game opens offline with sounds and deals', async () => {
+    await check('service worker installs, both games open offline with sounds and deals', async () => {
       await page.evaluate(() => navigator.serviceWorker.ready);
       await page.reload();
       await context.setOffline(true);
@@ -509,6 +978,9 @@ async function freshPage(browser, device, forced, opts = {}) {
         return Boolean(await c.match('sounds/riffle.wav')) && Boolean(await c.match('deals.js'));
       });
       assert.ok(cached, 'sounds and deals are saved for offline');
+      await page.goto(BASE + 'klondike/index.html');
+      await wait(page, 400);
+      assert.equal(await page.locator('.card').count(), 52, 'Solitaire opens offline too');
       await context.setOffline(false);
       assert.deepEqual(errors, []);
     });

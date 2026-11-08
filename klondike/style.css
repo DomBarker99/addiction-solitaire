@@ -1,0 +1,255 @@
+/*
+ * Solitaire's table. Loaded after ../style.css, which styles everything around it.
+ *
+ * ui.js puts every card, and every outline of an empty pile, in place with
+ * the CSS variables --x and --y (pixels from the board's top-left corner),
+ * stacks them with --z, and sets the card size on the board as --card-w and
+ * --card-h. Changing --x and --y is all it takes to move a card; the
+ * transition makes it slide.
+ */
+
+.board {
+  --card-w: 48px;
+  --card-h: 67px;
+}
+
+.spot,
+.card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--card-w);
+  height: var(--card-h);
+  transform: translate(var(--x, 0px), var(--y, 0px));
+}
+
+/* ---------- Empty piles ---------- */
+
+.spot {
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--gap-line);
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.1);
+  color: rgba(255, 255, 255, 0.3);
+  font-size: calc(var(--card-w) * 0.42);
+  font-weight: 700;
+}
+
+/* Where a dragged card can go. */
+.spot.target {
+  border: 2px solid var(--accent);
+  background: rgba(255, 213, 74, 0.2);
+  animation: glow 0.9s ease-in-out infinite alternate;
+}
+
+/* The stock, once it's empty: an arrow to turn the waste back over. */
+.spot.stock svg {
+  width: 52%;
+  height: 52%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  visibility: hidden;
+}
+
+.spot.stock.recycle {
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+}
+
+.spot.stock.recycle svg {
+  visibility: visible;
+}
+
+/* ---------- Cards ---------- */
+
+.card {
+  z-index: var(--z, 1);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  touch-action: none; /* lets a finger drag the card instead of scrolling */
+  transition: transform 200ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* Slide over the other cards, not under them. */
+.card.lifted {
+  z-index: calc(var(--z, 1) + 100);
+}
+
+/* Following a finger: no slide delay, drawn above everything. */
+.card.dragging {
+  z-index: calc(var(--z, 1) + 200);
+  transition: none;
+  cursor: grabbing;
+}
+
+.card.dragging .face {
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
+}
+
+.face,
+.back {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+}
+
+.face {
+  overflow: hidden;
+  background: var(--card);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.2),
+    0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.card.red .face {
+  color: var(--red);
+}
+
+.card.black .face {
+  color: var(--black);
+}
+
+/* Rank and suit along the top edge: the strip that shows when cards overlap. */
+.corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--card-h) * 0.29);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 calc(var(--card-w) * 0.07);
+  font-size: calc(var(--card-w) * 0.38);
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.corner .suit {
+  flex: none;
+  width: 0.8em;
+  height: 0.8em;
+  fill: currentColor;
+}
+
+/* The big suit in the middle, for the card on top of a pile. */
+.pip {
+  position: absolute;
+  left: 22%;
+  bottom: 9%;
+  width: 56%;
+  height: 52%;
+  fill: currentColor;
+}
+
+/* Face down: a red lattice inside a cream border. */
+.back {
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.14) 0 2px, transparent 2px 7px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.14) 0 2px, transparent 2px 7px),
+    #a3192f;
+  box-shadow:
+    inset 0 0 0 3px var(--card),
+    inset 0 0 0 4px rgba(0, 0, 0, 0.15),
+    0 1px 0 rgba(0, 0, 0, 0.2),
+    0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.card.down .face,
+.card:not(.down) .back {
+  visibility: hidden;
+}
+
+/* Covered exactly by the card above it in a pile: no shadow (see place() in ui.js). */
+.card.under .face {
+  box-shadow: none;
+}
+
+.card.under .back {
+  box-shadow:
+    inset 0 0 0 3px var(--card),
+    inset 0 0 0 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Turning over. */
+.card.turning .face,
+.card.turning .back {
+  animation: turn 180ms ease-out;
+}
+
+.card:focus {
+  outline: none;
+}
+
+.card:focus-visible .face,
+.card:focus-visible .back {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* The top card of a pile a dragged card can go on. */
+.card.target .face {
+  box-shadow:
+    0 0 0 3px var(--accent),
+    0 0 14px 2px rgba(255, 213, 74, 0.55);
+}
+
+.card.shake .face,
+.card.shake .back {
+  animation: shake 320ms ease-in-out;
+}
+
+/* A new deal: the cards fly out from the stock one after another. */
+.board.dealing .card {
+  transition-duration: 380ms;
+  transition-delay: var(--delay, 0ms);
+}
+
+/* Jumps with no slide: gathering the cards for a deal, or the screen changing size. */
+.board.instant .card {
+  transition: none;
+}
+
+/* Finish lights up once the cards can be played out. */
+#finish.ready {
+  background: var(--accent);
+  color: var(--black);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes turn {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .board.dealing .card {
+    transition-duration: 1ms;
+    transition-delay: 0ms;
+  }
+  .spot.target,
+  .card.shake .face,
+  .card.shake .back,
+  .card.turning .face,
+  .card.turning .back,
+  #finish.ready {
+    animation: none;
+  }
+}
