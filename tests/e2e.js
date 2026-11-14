@@ -2,8 +2,8 @@
  * Browser tests. Drives the installed Google Chrome pretending to be a Galaxy S26,
  * iPhones, a desktop and a sideways phone, and checks both games (Addiction and
  * Solitaire): layout, taps, drags, undo, the menu and pause, timer, settings,
- * switching games, auto-save, wins, losses, offline mode, opening straight from
- * the files, and installability.
+ * switching games, themes, auto-save, wins, losses, offline mode, opening
+ * straight from the files, and installability.
  *
  *   npm run test:browser      serves this repo on a random local port and tests it
  *   npm run test:live         tests the published site
@@ -31,6 +31,7 @@ const TYPES = {
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
+  '.ttf': 'font/ttf',
   '.wav': 'audio/wav',
 };
 function serveRepo() {
@@ -921,6 +922,270 @@ async function freshPage(browser, device, forced, opts = {}) {
     await context.close();
   }
 
+  // ---------- Themes ----------
+  // A page that opens with `theme` already chosen, as if it had been picked in the menu before.
+  async function themedPage(device, theme, { solitaire = false, table = null, forced = null } = {}) {
+    const context = await browser.newContext({ ...device, serviceWorkers: 'block' });
+    const page = await context.newPage();
+    page.errors = [];
+    page.on('console', (m) => m.type() === 'error' && page.errors.push(m.text()));
+    page.on('pageerror', (e) => page.errors.push(e.message));
+    await hooks(page, forced);
+    if (table) await forceSolitaire(page, table);
+    await page.addInitScript((theme) => {
+      if (!localStorage.getItem('solitaire-settings')) localStorage.setItem('solitaire-settings', JSON.stringify({ version: 1, theme }));
+    }, theme);
+    await page.goto(BASE + (solitaire ? 'klondike/index.html' : ''));
+    await page.evaluate(() => document.fonts.ready);
+    await wait(page, 400);
+    return { context, page };
+  }
+  const themeOf = (page) => page.evaluate(() => document.documentElement.dataset.theme);
+  const fontOf = (page, sel) => page.locator(sel).first().evaluate((el) => getComputedStyle(el).fontFamily);
+
+  // The Mickey themes use bigger lettering and draw a frame inside each card,
+  // so on every screen check that nothing spills. `edge` is how far inside the
+  // card the theme's frame is.
+  for (const [theme, edge] of [['film', 8], ['tickets', 7]]) {
+    for (const deviceName of ['galaxy-s26-app', 'iphone-se', 'desktop']) {
+      {
+        const { context, page } = await themedPage(DEVICES[deviceName], theme);
+        await page.screenshot({ path: path.join(OUT, `theme-${theme}-${deviceName}.png`) });
+        const m = await page.evaluate(() => {
+          const r = (sel) => document.querySelector(sel).getBoundingClientRect();
+          const slots = [...document.querySelectorAll('.slot')].map((e) => e.getBoundingClientRect());
+          let side = Infinity;
+          let above = Infinity;
+          for (const card of document.querySelectorAll('.card')) {
+            const face = card.querySelector('.face').getBoundingClientRect();
+            const rank = card.querySelector('.rank').getBoundingClientRect();
+            const suit = card.querySelector('.suit').getBoundingClientRect();
+            side = Math.min(side, rank.left - face.left, face.right - suit.right);
+            above = Math.min(above, suit.top - face.top, face.bottom - suit.bottom);
+          }
+          const status = document.getElementById('status');
+          return {
+            scrollH: document.documentElement.scrollHeight,
+            innerH: innerHeight,
+            scrollW: document.documentElement.scrollWidth,
+            innerW: innerWidth,
+            top: Math.min(...slots.map((s) => s.top)),
+            bottom: Math.max(...slots.map((s) => s.bottom)),
+            header: r('.topbar').bottom,
+            footer: r('.bottombar').top,
+            side,
+            above,
+            font: parseFloat(getComputedStyle(document.querySelector('.card .face')).fontSize),
+            titleCut: status.scrollWidth > status.clientWidth,
+            lettering: document.fonts.check("20px 'Lilita One'"),
+          };
+        });
+        await check(`theme ${theme}, ${deviceName}: Addiction fits, nothing spills out of a card (text ${m.font.toFixed(1)}px, ${m.side.toFixed(1)}px to spare at the sides)`, async () => {
+          assert.equal(await themeOf(page), theme);
+          assert.ok(m.lettering, 'the Lilita One lettering loaded');
+          assert.ok(m.scrollH <= m.innerH && m.scrollW <= m.innerW, JSON.stringify(m));
+          assert.ok(m.top >= m.header - 0.5 && m.bottom <= m.footer + 0.5, JSON.stringify(m));
+          assert.ok(m.side >= edge && m.above >= 3, JSON.stringify(m));
+          assert.ok(m.font >= 22 && !m.titleCut, JSON.stringify(m));
+          assert.deepEqual(page.errors, []);
+        });
+        await context.close();
+      }
+      {
+        // Tens (the widest rank) face up in the columns, the waste and a foundation, and plenty of cards face down.
+        const table = solitaireTable({
+          waste: '10♣',
+          foundations: [upTo('♠', 10), '', '', ''],
+          columns: ['K♥', 'Q♠ J♦', '10♥ 9♣ 8♦', '', '7♦', 'J♣ 10♦ 9♠ 8♥', 'Q♦'],
+          hidden: [0, 0, 0, 0, 0, 0, 0],
+        });
+        const { context, page } = await themedPage(DEVICES[deviceName], theme, { solitaire: true, table });
+        await page.screenshot({ path: path.join(OUT, `theme-${theme}-solitaire-${deviceName}.png`) });
+        const m = await page.evaluate(() => {
+          const r = (sel) => document.querySelector(sel).getBoundingClientRect();
+          const cards = [...document.querySelectorAll('.card')].map((e) => e.getBoundingClientRect());
+          let side = Infinity;
+          let between = Infinity;
+          for (const card of document.querySelectorAll('.card:not(.down)')) {
+            const face = card.querySelector('.face').getBoundingClientRect();
+            const rank = card.querySelector('.rank').getBoundingClientRect();
+            const suit = card.querySelector('.corner .suit').getBoundingClientRect();
+            side = Math.min(side, rank.left - face.left, face.right - suit.right);
+            between = Math.min(between, suit.left - rank.right);
+          }
+          return {
+            scrollH: document.documentElement.scrollHeight,
+            innerH: innerHeight,
+            scrollW: document.documentElement.scrollWidth,
+            innerW: innerWidth,
+            top: Math.min(...cards.map((c) => c.top)),
+            bottom: Math.max(...cards.map((c) => c.bottom)),
+            header: r('.topbar').bottom,
+            footer: r('.bottombar').top,
+            side,
+            between,
+            font: parseFloat(getComputedStyle(document.querySelector('.corner')).fontSize),
+            down: document.querySelectorAll('.card.down').length,
+          };
+        });
+        await check(`theme ${theme}, ${deviceName}: Solitaire fits, rank and suit stay inside the card and apart (text ${m.font.toFixed(1)}px)`, async () => {
+          assert.equal(await themeOf(page), theme);
+          assert.ok(m.scrollH <= m.innerH && m.scrollW <= m.innerW, JSON.stringify(m));
+          assert.ok(m.top >= m.header - 0.5 && m.bottom <= m.footer + 0.5, JSON.stringify(m));
+          assert.ok(m.side >= 2 && m.between >= 1, JSON.stringify(m));
+          assert.ok(m.font >= 18 && m.down > 10, JSON.stringify(m));
+          assert.deepEqual(page.errors, []);
+        });
+        await context.close();
+      }
+    }
+  }
+
+  {
+    const { context, page } = await freshPage(browser, phone);
+    await check('themes: Classic to start with; picking one in the menu restyles the page and is remembered', async () => {
+      assert.equal(await themeOf(page), 'classic');
+      assert.ok(await page.locator('.logo').isHidden());
+      assert.ok(!(await fontOf(page, '.card .face')).includes('Lilita'));
+      const mv = await findMove(page);
+      await page.tap(`.card[data-card="${mv.card}"]`);
+      await wait(page, 300);
+      const board = await readBoard(page);
+      await page.tap('#menu-button');
+      await wait(page, 300);
+      assert.equal(await page.locator('[data-set-theme="classic"]').getAttribute('aria-checked'), 'true');
+      await page.tap('[data-set-theme="film"]');
+      assert.equal(await page.locator('[data-set-theme="film"]').getAttribute('aria-checked'), 'true');
+      assert.equal(await page.locator('[data-set-theme="classic"]').getAttribute('aria-checked'), 'false');
+      assert.equal(await themeOf(page), 'film');
+      assert.equal(await page.locator('meta[name="theme-color"]').getAttribute('content'), '#161616');
+      assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('solitaire-settings')).theme), 'film');
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({ path: path.join(OUT, 'theme-film-menu.png') });
+      await page.tap('.menu-panel [data-action="resume"]');
+      await wait(page, 300);
+      assert.ok((await fontOf(page, '.card .face')).includes('Lilita'));
+      assert.ok(await page.locator('.logo').isVisible());
+      assert.deepEqual(await readBoard(page), board, 'the game in progress is untouched');
+      await page.reload();
+      await wait(page, 500);
+      assert.equal(await themeOf(page), 'film', 'still there after a reload');
+      assert.equal(await page.locator('[data-set-theme="film"]').getAttribute('aria-checked'), 'true');
+    });
+    await check('themes: the theme is shared by both games, and Classic brings the old look back', async () => {
+      await page.tap('[data-switch="klondike"]');
+      await page.waitForURL(/klondike\/index\.html$/);
+      await page.evaluate(() => document.fonts.ready);
+      await wait(page, 400);
+      assert.equal(await themeOf(page), 'film');
+      assert.ok((await fontOf(page, '.corner')).includes('Lilita'));
+      await page.tap('#menu-button');
+      await wait(page, 300);
+      await page.tap('[data-set-theme="tickets"]');
+      assert.equal(await themeOf(page), 'tickets');
+      assert.equal(await page.locator('meta[name="theme-color"]').getAttribute('content'), '#101010');
+      await page.screenshot({ path: path.join(OUT, 'theme-tickets-menu.png') });
+      await page.tap('[data-set-theme="classic"]');
+      assert.equal(await themeOf(page), 'classic');
+      assert.equal(await page.locator('meta[name="theme-color"]').getAttribute('content'), '#0b5530');
+      await page.tap('.menu-panel [data-action="resume"]');
+      await wait(page, 300);
+      assert.ok(!(await fontOf(page, '.corner')).includes('Lilita'));
+      assert.ok(await page.locator('.logo').isHidden());
+    });
+    await check('themes: no page errors', async () => assert.deepEqual(page.errors, []));
+    await context.close();
+  }
+
+  // The states that are drawn differently in a theme: a gap to pick, a place to drop, and the win.
+  for (const theme of ['film', 'tickets']) {
+    {
+      const b = solvedBoard();
+      b[12] = id(2, 2); b[26] = null;
+      b[25] = id(3, 2); b[39] = null;
+      const { context, page } = await themedPage(phone, theme, { forced: { board: b, shufflesLeft: 3 } });
+      await check(`theme ${theme}: a 2 with two gaps lights them up, and a tap on one moves it`, async () => {
+        await page.tap(`.card[data-card="${id(2, 2)}"]`);
+        assert.equal(await text(page, '#status'), 'Tap a gap for this 2');
+        assert.equal(await page.locator('.slot.target').count(), 2);
+        await wait(page, 500);
+        await page.screenshot({ path: path.join(OUT, `theme-${theme}-pick-a-gap.png`) });
+        await page.tap('.slot[data-slot="39"]');
+        await wait(page, 400);
+        assert.equal(await cardSlot(page, id(2, 2)), 39);
+        assert.deepEqual(page.errors, []);
+      });
+      await context.close();
+    }
+    {
+      const b = solvedBoard();
+      b[50] = null;
+      b[51] = id(3, 13);
+      const { context, page } = await themedPage(phone, theme, { forced: { board: b, shufflesLeft: 3 } });
+      await check(`theme ${theme}: the win is celebrated, with the flying cards drawn in the theme's colours`, async () => {
+        const paper = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--card').trim());
+        assert.notEqual(paper, '#fffdf7');
+        await page.tap(`.card[data-card="${id(3, 13)}"]`);
+        await page.waitForSelector('canvas.celebration', { timeout: 3000 });
+        await wait(page, 1500);
+        await page.screenshot({ path: path.join(OUT, `theme-${theme}-win.png`) });
+        // A card that has flown clear of the board: its paper colour is on the canvas.
+        const seen = await page.evaluate((paper) => {
+          const probe = document.createElement('canvas').getContext('2d');
+          probe.fillStyle = paper;
+          probe.fillRect(0, 0, 1, 1);
+          const [r, g, b] = probe.getImageData(0, 0, 1, 1).data;
+          const canvas = document.querySelector('canvas.celebration');
+          const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+          let count = 0;
+          for (let i = 0; i < data.length; i += 4) if (data[i] === r && data[i + 1] === g && data[i + 2] === b && data[i + 3] === 255) count++;
+          return count;
+        }, paper);
+        assert.ok(seen > 500, `${seen} pixels of the theme's card colour on the canvas`);
+        await page.mouse.click(200, 300);
+        await page.waitForSelector('#overlay:not([hidden])', { timeout: 3000 });
+        assert.equal(await text(page, '#overlay-title'), 'You won!');
+        await page.screenshot({ path: path.join(OUT, `theme-${theme}-won.png`) });
+        assert.deepEqual(page.errors, []);
+      });
+      await context.close();
+    }
+    {
+      const table = solitaireTable({
+        stock: '3♥ A♥',
+        foundations: ['', '', upTo('♦', 4), 'A♣'],
+        columns: ['K♣', '5♦ 8♠', '9♥', '2♣ 10♦ 9♣', 'J♠', 'Q♥', 'K♦'],
+        hidden: [0, 1, 0, 1, 0, 0, 0],
+      });
+      const { context, page } = await themedPage(phone, theme, { solitaire: true, table });
+      await check(`theme ${theme}: Solitaire shows where a dragged card can go, and the drop works`, async () => {
+        const from = await topOf(page, kcard('10♦'));
+        const to = await topOf(page, kcard('J♠'));
+        const cdp = await context.newCDPSession(page);
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: from.x, y: from.y }] });
+        for (let i = 1; i <= 8; i++) {
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: from.x + ((to.x - from.x) * i) / 8, y: from.y + ((to.y - from.y) * i) / 8 }] });
+        }
+        await wait(page, 300);
+        // The J♠ is lit up. However the theme draws that, it has to be something a mask can't hide.
+        const lit = await page.locator(`.card[data-card="${kcard('J♠')}"]`).evaluate((el) => {
+          const face = getComputedStyle(el.querySelector('.face'));
+          const masked = (face.maskImage || face.webkitMaskImage || 'none') !== 'none';
+          return { target: el.classList.contains('target'), masked, filter: getComputedStyle(el).filter, shadow: face.boxShadow };
+        });
+        await page.screenshot({ path: path.join(OUT, `theme-${theme}-solitaire-drag.png`) });
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await cdp.detach();
+        await wait(page, 400);
+        assert.ok(lit.target, JSON.stringify(lit));
+        assert.ok(lit.masked ? lit.filter !== 'none' : lit.shadow !== 'none', JSON.stringify(lit));
+        assert.equal((await whereIs(page, kcard('10♦'))).pile, 'c4');
+        assert.deepEqual(page.errors, []);
+      });
+      await context.close();
+    }
+  }
+
   // ---------- Opening straight from the files (double-clicking index.html) ----------
   {
     const context = await browser.newContext({ ...phone });
@@ -955,6 +1220,15 @@ async function freshPage(browser, device, forced, opts = {}) {
         assert.ok(files.has(file), `${pageFile} loads ${file}, which isn't in FILES`);
       }
     }
+    // The stylesheets load files too: the themes' lettering and pictures.
+    for (const cssFile of ['style.css', 'addiction.css', 'klondike/style.css']) {
+      const css = fs.readFileSync(path.join(ROOT, cssFile), 'utf8');
+      for (const [, ref] of css.matchAll(/url\('([^')]+)'\)/g)) {
+        const file = path.posix.normalize(path.posix.join(path.posix.dirname(cssFile), ref));
+        assert.ok(files.has(file), `${cssFile} loads ${file}, which isn't in FILES`);
+        assert.ok(fs.existsSync(path.join(ROOT, file)), `${cssFile} loads ${file}, which doesn't exist`);
+      }
+    }
   });
 
   // ---------- Install + offline ----------
@@ -975,9 +1249,9 @@ async function freshPage(browser, device, forced, opts = {}) {
       const cached = await page.evaluate(async () => {
         const keys = await caches.keys();
         const c = await caches.open(keys.find((k) => k.startsWith('addiction-')));
-        return Boolean(await c.match('sounds/riffle.wav')) && Boolean(await c.match('deals.js'));
+        return Boolean(await c.match('sounds/riffle.wav')) && Boolean(await c.match('deals.js')) && Boolean(await c.match('fonts/LilitaOne-Regular.ttf'));
       });
-      assert.ok(cached, 'sounds and deals are saved for offline');
+      assert.ok(cached, 'sounds, deals and the themes\' lettering are saved for offline');
       await page.goto(BASE + 'klondike/index.html');
       await wait(page, 400);
       assert.equal(await page.locator('.card').count(), 52, 'Solitaire opens offline too');

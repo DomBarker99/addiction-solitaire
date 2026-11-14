@@ -50,6 +50,7 @@
         <button id="menu-button" class="icon-button" type="button" aria-label="Menu" aria-controls="menu">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16" /></svg>
         </button>
+        <span class="logo" aria-hidden="true"></span>
         <span id="status" class="status" aria-live="polite">Addiction Solitaire</span>
         <span id="timer" class="timer" aria-label="Time">0:00</span>
       </header>
@@ -84,6 +85,14 @@
           <div class="segmented" role="radiogroup" aria-labelledby="game-label">
             <button type="button" role="radio" data-switch="addiction">Addiction</button>
             <button type="button" role="radio" data-switch="klondike">Solitaire</button>
+          </div>
+        </div>
+        <div class="setting stacked">
+          <span id="theme-label" class="setting-name">Theme</span>
+          <div class="segmented" role="radiogroup" aria-labelledby="theme-label">
+            <button type="button" role="radio" data-set-theme="classic">Classic</button>
+            <button type="button" role="radio" data-set-theme="film">Mickey<br />film</button>
+            <button type="button" role="radio" data-set-theme="tickets">Mickey<br />tickets</button>
           </div>
         </div>
         <div class="setting">

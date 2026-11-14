@@ -48,7 +48,10 @@ Tap a card to send it to the best place for it (home to a foundation if it can g
 - **Every Addiction deal can be won without shuffling.** New games come from a bank of 10,000 deals that a solver has proven winnable (see [The deal bank](#the-deal-bank)). A phone never repeats a deal until it has played all of them. Solitaire deals at random for now.
 - **Undo**, as many times as you like, including Addiction's shuffles and every tap on Solitaire's stock. Each Addiction deal's shuffles are fixed, so undoing a shuffle and shuffling again gives the same result.
 - **"No more moves"** in Solitaire only when nothing you could do would ever get another card home, turned over or out of the stock.
-- **Menu (☰)** pauses the game (the board is hidden and the clock stops) and has New game, Game, Sound and Timer settings, plus Draw 1 or 3 in Solitaire. Leaving the app pauses it too.
+- **Menu (☰)** pauses the game (the board is hidden and the clock stops) and has New game, Game, Theme, Sound and Timer settings, plus Draw 1 or 3 in Solitaire. Leaving the app pauses it too.
+- **Themes:** Classic green felt, or two Mickey Mouse themes drawn in the style of his first cartoon (1928), with bigger, bolder numbers. The theme applies to both games.
+  - **Mickey film:** black-and-white film. In Addiction every column is a strip of film and every card a frame; in Solitaire the face-down cards are a silent film's title cards.
+  - **Mickey tickets:** a night at the picture house, with a velvet curtain and marquee bulbs. Every card is an admission ticket.
 - **Timer** starts with the first move and can be hidden.
 - **Sounds:** card slides or wood knocks on every move, a riffle on shuffles, and a sad trombone when you lose. They can be turned off.
 - **Win animations** take turns: a classic bouncing-card cascade, then confetti.
@@ -68,12 +71,13 @@ Plain HTML, CSS and JavaScript. There are no frameworks and no build step, so ev
 | `klondike/` | Solitaire: its page, rules (`rules.js`), table (`ui.js`) and cards (`style.css`) |
 | `shell.js` | Shared by both games: menu and pause, game switcher, settings, timer, win/lose panel, auto-save |
 | `cards.js` | Shared: card names, suits and the seeded random numbers behind numbered deals |
-| `style.css` | Shared: the felt, bars, buttons, menu and panels |
+| `style.css` | Shared: the felt, bars, buttons, menu and panels. The themes start at the end of this file |
 | `audio.js` | Sounds |
 | `celebrate.js` | Win animations |
 | `manifest.json` | Makes it installable: name, icons, full screen, portrait |
 | `sw.js` | Service worker: lets both games open without internet |
-| `icons/` | App icons. `icon.svg` is the source |
+| `icons/` | App icons (`icon.svg` is the source), and the mouse drawn for the Mickey themes |
+| `fonts/` | The lettering the Mickey themes use |
 | `sounds/` | Sound clips |
 | `tools/` | The solver that builds `deals.js`, and a Kubernetes job to run it |
 | `tests/` | Rules tests and browser tests |
@@ -96,11 +100,11 @@ You need Node.js 20 or newer and Google Chrome.
 
 ```sh
 npm install
-npm test            # rules tests, then browser tests on a local copy (~70 s)
+npm test            # rules tests, then browser tests on a local copy (~90 s)
 npm run test:live   # browser tests against the published site
 ```
 
-The browser tests drive Chrome as a Galaxy S26, two iPhones, a desktop and a sideways phone. For both games they check the layout, taps, drags, undo, menu and pause, timer, settings, switching games, auto-save, winning, losing, offline mode, opening straight from the files and installability, and save screenshots to a temporary folder.
+The browser tests drive Chrome as a Galaxy S26, two iPhones, a desktop and a sideways phone. For both games they check the layout, taps, drags, undo, menu and pause, timer, settings, switching games, themes, auto-save, winning, losing, offline mode, opening straight from the files and installability, and save screenshots to a temporary folder.
 
 ## Publishing
 
@@ -125,3 +129,5 @@ node tools/make-deals.js bank deals-raw.jsonl --count 10000      # checks the re
 
 - Card and wood sounds: [Kenney](https://kenney.nl), *Casino Audio* and *Impact Sounds*, released into the public domain (CC0).
 - Addiction's rules as played on [cardgames.io](https://cardgames.io/addiction/).
+- The Mickey themes' lettering: [Lilita One](https://fonts.google.com/specimen/Lilita+One) by Juan Montoreano, under the SIL Open Font License (`fonts/OFL.txt`).
+- The mouse in the Mickey themes was drawn for this game, after the Mickey Mouse of *Steamboat Willie* (1928), which has been in the public domain in the United States since 2024. This game isn't made or endorsed by Disney.

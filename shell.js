@@ -13,7 +13,7 @@
  *
  * Saved data (localStorage). Every game on this web address shares it, so
  * each key is named after the game:
- *   'solitaire-settings'   { version: 1, sound, timer, lastGame, draw }
+ *   'solitaire-settings'   { version: 1, sound, timer, theme, lastGame, draw }
  *   'addiction-solitaire'  Addiction's game in progress  } { version, game, clock,
  *   'klondike-solitaire'   Solitaire's game in progress  }   dealOrder, nextCelebration }
  */
@@ -30,6 +30,15 @@
     { id: 'klondike', page: 'klondike/index.html' },
   ];
   const START_GAME = 'addiction'; // index.html, the page the installed app opens
+
+  // The looks to choose from in the menu. `bar` is the colour phones give
+  // their own status bar, to match the top of the page. The looks themselves
+  // are at the end of style.css and of each game's own stylesheet.
+  const THEMES = [
+    { id: 'classic', bar: '#0b5530' },
+    { id: 'film', bar: '#161616' },
+    { id: 'tickets', bar: '#101010' },
+  ];
 
   const SETTINGS_KEY = 'solitaire-settings';
   const ADDICTION_SAVE_KEY = 'addiction-solitaire'; // its version 1 also held the settings
@@ -55,7 +64,7 @@
     }
   }
 
-  // Sound, timer and the game played last are shared by every game. A game
+  // Sound, timer, theme and the game played last are shared by every game. A game
   // can keep its own preferences here too (Solitaire keeps `draw`). Before
   // Solitaire was added, Addiction kept sound and timer in its own save, so
   // the first time they're picked up from there.
@@ -65,11 +74,21 @@
     const settings = { ...saved, version: 1 };
     if (!['off', 'wood', 'card'].includes(settings.sound)) settings.sound = 'card';
     if (typeof settings.timer !== 'boolean') settings.timer = true;
+    if (!THEMES.some((t) => t.id === settings.theme)) settings.theme = 'classic';
     if (!GAMES.some((g) => g.id === settings.lastGame)) settings.lastGame = null;
     return settings;
   }
 
   const settings = loadSettings();
+
+  // Puts the chosen look on the page: <html data-theme="film">. This file
+  // loads in the <head>, so it's there before anything is drawn.
+  function applyTheme() {
+    document.documentElement.dataset.theme = settings.theme;
+    const bar = document.querySelector('meta[name="theme-color"]');
+    if (bar) bar.content = THEMES.find((t) => t.id === settings.theme).bar;
+  }
+  applyTheme();
 
   // The installed app always opens index.html (Addiction). If another game was
   // played last, go straight to it. Only the start page does this, so a link
@@ -211,6 +230,9 @@
       }
       for (const button of menuEl.querySelectorAll('[data-switch]')) {
         button.setAttribute('aria-checked', String(button.dataset.switch === GAME));
+      }
+      for (const button of menuEl.querySelectorAll('[data-set-theme]')) {
+        button.setAttribute('aria-checked', String(button.dataset.setTheme === settings.theme));
       }
       timerSwitch.setAttribute('aria-checked', String(settings.timer));
       dealNumberEl.textContent = game.dealNote();
@@ -371,7 +393,7 @@
       $('menu-button').addEventListener('click', openMenu);
 
       menuEl.addEventListener('click', (event) => {
-        const target = event.target.closest('[data-action], [data-sound], [data-switch], #timer-switch');
+        const target = event.target.closest('[data-action], [data-sound], [data-switch], [data-set-theme], #timer-switch');
         if (!target) return;
         if (target.dataset.action === 'resume') closeMenu();
         else if (target.dataset.action === 'new-game') {
@@ -390,6 +412,11 @@
           saveSettings();
         } else if (target.dataset.switch) {
           switchTo(target.dataset.switch);
+        } else if (THEMES.some((t) => t.id === target.dataset.setTheme)) {
+          settings.theme = target.dataset.setTheme;
+          applyTheme();
+          renderMenu();
+          saveSettings();
         }
       });
 

@@ -253,3 +253,132 @@
     animation: none;
   }
 }
+
+/* ---------- Themes (see the end of ../style.css) ---------- */
+
+/* --- Both Mickey themes: bigger, heavier lettering --- */
+
+html[data-theme='film'] .corner,
+html[data-theme='tickets'] .corner {
+  font-family: var(--card-font);
+  font-size: calc(var(--card-w) * 0.44);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* "10" is the only rank with two characters, so it is drawn a little narrower, as printed cards do. */
+html[data-theme='film'] .rank.ten,
+html[data-theme='tickets'] .rank.ten {
+  font-size: 0.9em;
+  letter-spacing: -0.06em;
+}
+
+html[data-theme='film'] .spot,
+html[data-theme='tickets'] .spot {
+  font-family: var(--card-font);
+  font-weight: 400;
+}
+
+html[data-theme='film'] .spot.target,
+html[data-theme='tickets'] .spot.target {
+  background: rgba(255, 213, 74, 0.25);
+}
+
+/* --- Mickey film: cream cards with an ink outline; face down, a silent film's title card --- */
+
+html[data-theme='film'] .spot {
+  background: rgba(0, 0, 0, 0.28);
+  color: rgba(233, 223, 198, 0.42);
+}
+
+html[data-theme='film'] .face,
+html[data-theme='film'] .back {
+  border-radius: 5px;
+}
+
+html[data-theme='film'] .face {
+  box-shadow:
+    inset 0 0 0 1.5px #141414,
+    0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+html[data-theme='film'] .card.dragging .face {
+  box-shadow:
+    inset 0 0 0 1.5px #141414,
+    0 10px 22px rgba(0, 0, 0, 0.45);
+}
+
+/* Black, a cream double rule round the edge, and the mouse in the middle. */
+html[data-theme='film'] .back,
+html[data-theme='film'] .card.under .back {
+  background: #0e0e0e url('../icons/mouse-badge.svg') center / 60% auto no-repeat;
+  box-shadow:
+    inset 0 0 0 1.5px #e9dfc6,
+    inset 0 0 0 3.5px #0e0e0e,
+    inset 0 0 0 4.5px rgba(233, 223, 198, 0.55),
+    0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+/* --- Mickey tickets: the strip along the top of each card is the ticket's stub --- */
+
+html[data-theme='tickets'] .spot {
+  background: rgba(0, 0, 0, 0.4);
+  color: rgba(246, 231, 184, 0.55);
+}
+
+/* The tear line under the stub. */
+html[data-theme='tickets'] .corner {
+  border-bottom: 1.5px dashed rgba(196, 18, 47, 0.5);
+}
+
+/*
+ * The mask punches a notch at each end of the tear line. Whatever is outside
+ * a mask isn't drawn, shadows and outlines included, so the edge of the card
+ * is a thin border, and the states that normally use a shadow or an outline
+ * (dragged, a place to drop, keyboard focus) glow with `filter` on the whole
+ * card instead.
+ */
+html[data-theme='tickets'] .face,
+html[data-theme='tickets'] .back,
+html[data-theme='tickets'] .card.under .back {
+  border-radius: 4px;
+  box-shadow: none;
+  -webkit-mask:
+    radial-gradient(circle at 0 29%, transparent 0 3.6px, #000 4.1px) left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% 29%, transparent 0 3.6px, #000 4.1px) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle at 0 29%, transparent 0 3.6px, #000 4.1px) left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% 29%, transparent 0 3.6px, #000 4.1px) right / 51% 100% no-repeat;
+}
+
+html[data-theme='tickets'] .face {
+  border: 1px solid rgba(70, 20, 10, 0.6);
+}
+
+/* Face down: a red ticket with a cream rule inside its edge, and the mouse. */
+html[data-theme='tickets'] .back,
+html[data-theme='tickets'] .card.under .back {
+  border: 1px solid #3d060c;
+  background: #a3121f url('../icons/mouse-badge.svg') center 62% / 56% auto no-repeat;
+  box-shadow:
+    inset 0 0 0 2.5px #a3121f,
+    inset 0 0 0 3.5px rgba(246, 231, 184, 0.8);
+}
+
+html[data-theme='tickets'] .card.dragging {
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.5));
+}
+
+html[data-theme='tickets'] .card.target {
+  filter: drop-shadow(0 0 2px var(--accent)) drop-shadow(0 0 6px var(--accent));
+}
+
+html[data-theme='tickets'] .card:focus-visible {
+  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 3px #fff);
+}
+
+/* Finish, once it can be pressed, stands out in red (see ../style.css). */
+html[data-theme='tickets'] #finish.ready {
+  background: #d3202f;
+  color: #fff5dc;
+}

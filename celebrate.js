@@ -79,8 +79,23 @@
     });
   }
 
+  // The colours and lettering of the cards in the theme being shown (see
+  // "Themes" in style.css). The classic look doesn't set a font, so it keeps
+  // the one this file has always used.
+  function cardLook() {
+    const css = getComputedStyle(document.documentElement);
+    const value = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
+    return {
+      paper: value('--card', '#fffdf7'),
+      red: value('--red', '#c41e3a'),
+      black: value('--black', '#1d1d1f'),
+      font: value('--card-font', "system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif"),
+      weight: value('--card-font-weight', '700'),
+    };
+  }
+
   // A picture of one card, drawn once and reused every frame.
-  function cardPicture(card, width, height, dpr) {
+  function cardPicture(card, width, height, dpr, look) {
     const canvas = document.createElement('canvas');
     canvas.width = Math.ceil(width * dpr);
     canvas.height = Math.ceil(height * dpr);
@@ -90,15 +105,15 @@
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(0.5, 0.5, width - 1, height - 1, radius);
     else ctx.rect(0.5, 0.5, width - 1, height - 1);
-    ctx.fillStyle = '#fffdf7';
+    ctx.fillStyle = look.paper;
     ctx.fill();
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
     ctx.stroke();
 
     const suit = C.SUITS[C.suitOf(card)];
-    ctx.fillStyle = suit.red ? '#c41e3a' : '#1d1d1f';
+    ctx.fillStyle = suit.red ? look.red : look.black;
     const size = Math.round(Math.min(height * 0.52, width * 0.36));
-    ctx.font = `700 ${size}px system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif`;
+    ctx.font = `${look.weight} ${size}px ${look.font}`;
     ctx.textBaseline = 'middle';
     const label = C.rankLabel(card);
     const labelWidth = ctx.measureText(label).width;
@@ -134,6 +149,7 @@
           b.rect.top - a.rect.top || C.rankOf(b.card) - C.rankOf(a.card) || a.rect.left - b.rect.left,
       );
     const flying = [];
+    const look = cardLook();
     let tick = 0;
 
     const launch = () => {
@@ -141,7 +157,7 @@
       el.style.visibility = 'hidden';
       const direction = Math.random() < 0.5 ? -1 : 1;
       flying.push({
-        picture: cardPicture(card, rect.width, rect.height, dpr),
+        picture: cardPicture(card, rect.width, rect.height, dpr, look),
         x: rect.left,
         y: rect.top,
         w: rect.width,

@@ -155,3 +155,192 @@ body[data-status='stuck'] #shuffle {
     animation: none;
   }
 }
+
+/* ---------- Themes (see the end of style.css) ---------- */
+
+/* --- Both Mickey themes: bigger, heavier lettering --- */
+
+html[data-theme='film'] .card .face,
+html[data-theme='tickets'] .card .face {
+  font-family: var(--card-font);
+  font-weight: 400;
+  font-size: 26px; /* fallback for older browsers */
+}
+
+/* "10" is the only rank with two characters, so it is drawn a little narrower, as printed cards do. */
+html[data-theme='film'] .rank.ten,
+html[data-theme='tickets'] .rank.ten {
+  font-size: 0.9em;
+  letter-spacing: -0.06em;
+}
+
+/* Keeps the rank and suit in front of the picture drawn behind them (.face::before). */
+html[data-theme='film'] .rank,
+html[data-theme='film'] .suit,
+html[data-theme='tickets'] .rank,
+html[data-theme='tickets'] .suit {
+  position: relative;
+}
+
+/* --- Mickey film: each column is a strip of film, each card a frame --- */
+
+html[data-theme='film'] {
+  /* One sprocket hole. They repeat down both edges of the film, four to a card. */
+  --sprocket: linear-gradient(to bottom, transparent 0 26%, #e9dfc6 26% 74%, transparent 74%);
+}
+
+/*
+ * The film itself: black, as tall as the tile so the strips join up, with
+ * holes down both edges. The second selector is the gap a card can go to,
+ * which the classic look paints yellow.
+ */
+html[data-theme='film'] .face,
+html[data-theme='film'] .slot.target .face {
+  inset: 0 3px;
+  border: 0;
+  border-radius: 0;
+  background:
+    var(--sprocket) 1.5px 0 / 4px 25% repeat-y,
+    var(--sprocket) calc(100% - 1.5px) 0 / 4px 25% repeat-y,
+    #0b0b0b;
+  box-shadow: none;
+  animation: none;
+}
+
+/* The frame: the picture area between the two rows of holes. */
+html[data-theme='film'] .face::before {
+  content: '';
+  position: absolute;
+  inset: 2.5px 7px;
+  border-radius: 4px;
+  background: var(--card);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(0, 0, 0, 0.5),
+    inset 0 0 9px rgba(120, 90, 30, 0.28);
+}
+
+html[data-theme='film'] .card .face {
+  font-size: min(5.1cqh, 9.7cqw);
+}
+
+/* A gap is a frame with nothing filmed on it yet: sepia, with the mouse faintly in it. */
+html[data-theme='film'] .slot .face::before {
+  background: #6b6455;
+  box-shadow:
+    inset 0 0 0 1.5px rgba(0, 0, 0, 0.5),
+    inset 0 0 12px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme='film'] .slot .face::after {
+  content: '';
+  position: absolute;
+  inset: 2.5px 7px;
+  background: url('icons/mouse.svg') center / auto 84% no-repeat;
+  opacity: 0.6;
+}
+
+/* A gap a card can go to: the frame turns gold and glows. */
+html[data-theme='film'] .slot.target .face::before {
+  background: #a58a2c;
+  box-shadow: inset 0 0 0 3px var(--accent);
+  animation: frame-glow 0.9s ease-in-out infinite alternate;
+}
+
+/* The 2 waiting for its gap: the ring goes round the frame, not the whole strip. */
+html[data-theme='film'] .card.selected .face {
+  box-shadow: none;
+}
+
+html[data-theme='film'] .card.selected .face::before {
+  box-shadow:
+    inset 0 0 0 3px var(--accent),
+    0 0 10px 2px rgba(255, 213, 74, 0.6);
+}
+
+@keyframes frame-glow {
+  from {
+    box-shadow:
+      inset 0 0 0 3px var(--accent),
+      0 0 0 0 rgba(255, 213, 74, 0);
+  }
+  to {
+    box-shadow:
+      inset 0 0 0 3px var(--accent),
+      0 0 12px 2px rgba(255, 213, 74, 0.55);
+  }
+}
+
+/* --- Mickey tickets: every card is an admission ticket --- */
+
+/*
+ * The mask punches a half-circle out of each side. Whatever is outside a
+ * mask isn't drawn, shadows and outlines included, so the states that
+ * normally use those (dragged, chosen, keyboard focus) glow with `filter`
+ * on the whole card instead.
+ */
+html[data-theme='tickets'] .card .face {
+  border-radius: 5px;
+  box-shadow: none;
+  font-size: min(5.1cqh, 9.9cqw);
+  -webkit-mask:
+    radial-gradient(circle at 0 50%, transparent 0 5.5px, #000 6px) left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% 50%, transparent 0 5.5px, #000 6px) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle at 0 50%, transparent 0 5.5px, #000 6px) left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% 50%, transparent 0 5.5px, #000 6px) right / 51% 100% no-repeat;
+}
+
+/* The thin red rule printed inside the ticket's edge. */
+html[data-theme='tickets'] .card .face::before {
+  content: '';
+  position: absolute;
+  inset: 3px 6px;
+  border: 1.5px solid rgba(196, 18, 47, 0.6);
+  border-radius: 3px;
+}
+
+html[data-theme='tickets'] .card.dragging {
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.5));
+}
+
+html[data-theme='tickets'] .card.selected {
+  filter: drop-shadow(0 0 2px var(--accent)) drop-shadow(0 0 6px var(--accent));
+}
+
+html[data-theme='tickets'] .card.selected .face::before {
+  border: 2.5px solid var(--red);
+}
+
+html[data-theme='tickets'] .card:focus-visible {
+  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 3px #fff);
+}
+
+/* A gap: a dark window in the curtain, with the mouse faintly in it. */
+html[data-theme='tickets'] .slot .face {
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.42);
+}
+
+html[data-theme='tickets'] .slot .face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('icons/mouse-badge.svg') center / auto 70% no-repeat;
+  opacity: 0.62;
+}
+
+html[data-theme='tickets'] .slot.target .face {
+  background: rgba(255, 215, 94, 0.4);
+}
+
+/* Stuck: the button to press stands out in red (see style.css). */
+html[data-theme='tickets'] body[data-status='stuck'] #shuffle {
+  background: #d3202f;
+  color: #fff5dc;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme='film'] .slot.target .face::before {
+    animation: none;
+  }
+}

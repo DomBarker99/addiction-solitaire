@@ -8,7 +8,7 @@
  *
  * If you add or rename a file, add it to FILES and change VERSION.
  */
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = `addiction-${VERSION}`;
 const FILES = [
   './',
@@ -37,6 +37,9 @@ const FILES = [
   'sounds/wood-3.wav',
   'sounds/wood-4.wav',
   'sounds/riffle.wav',
+  'fonts/LilitaOne-Regular.ttf',
+  'icons/mouse.svg',
+  'icons/mouse-badge.svg',
   'icons/icon.svg',
   'icons/icon-192.png',
   'icons/icon-512.png',

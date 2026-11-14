@@ -112,7 +112,7 @@
       el.dataset.card = card;
       el.setAttribute('aria-label', G.cardName(card));
       el.innerHTML =
-        `<span class="face"><span class="rank">${G.rankLabel(card)}</span>` +
+        `<span class="face"><span class="rank${G.rankOf(card) === 10 ? ' ten' : ''}">${G.rankLabel(card)}</span>` +
         `<svg class="suit" aria-hidden="true"><use href="#suit-${suit.name}"></use></svg></span>`;
       boardEl.append(el);
       cardEls.set(card, el);

@@ -5,6 +5,11 @@
  *
  * Each game styles its own cards in its own file: addiction.css for Addiction,
  * klondike/style.css for Solitaire.
+ *
+ * The look can be changed in the menu (Theme). shell.js writes the choice on
+ * the page as <html data-theme="classic">, "film" or "tickets". Everything up
+ * to "Themes" near the end of this file is the classic look; the two Mickey
+ * themes change it from there, and each game's file ends the same way.
  */
 
 :root {
@@ -97,6 +102,15 @@ body {
   stroke: currentColor;
   stroke-width: 2.2;
   stroke-linecap: round;
+}
+
+/* The mouse next to the title. Only the Mickey themes show it. */
+.logo {
+  display: none;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  background: url('icons/mouse-badge.svg') center / contain no-repeat;
 }
 
 .status {
@@ -347,6 +361,20 @@ body.paused .board {
   font-weight: 600;
 }
 
+/* A setting with too many choices for one line: its name sits above them. */
+.setting.stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.setting.stacked .segmented button {
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  line-height: 1.15;
+}
+
 /* Off / Wood / Card */
 .segmented {
   display: flex;
@@ -494,4 +522,183 @@ body.paused .board {
     transition-duration: 1ms;
     transition-delay: 0ms;
   }
+}
+
+/* ---------- Themes ---------- */
+
+/*
+ * Two Mickey Mouse themes, both drawn in the style of his first cartoon (1928):
+ *   film     black-and-white film, cream frames, red the only colour
+ *   tickets  a night at the picture house: velvet curtain, marquee bulbs, tickets
+ * This part restyles what every game shares. The cards are restyled at the end
+ * of addiction.css and klondike/style.css.
+ *
+ * The lettering is Lilita One (fonts/, SIL Open Font License).
+ */
+@font-face {
+  font-family: 'Lilita One';
+  src: url('fonts/LilitaOne-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+
+/* --- Both Mickey themes --- */
+
+html[data-theme='film'],
+html[data-theme='tickets'] {
+  --red: #c4122f;
+  --black: #141414;
+  /* The lettering on the cards. celebrate.js reads these two to draw the flying cards. */
+  --card-font: 'Lilita One', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --card-font-weight: 400;
+}
+
+html[data-theme='film'] .logo,
+html[data-theme='tickets'] .logo {
+  display: block;
+}
+
+html[data-theme='film'] .status,
+html[data-theme='tickets'] .status,
+html[data-theme='film'] .timer,
+html[data-theme='tickets'] .timer {
+  font-family: var(--card-font);
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+html[data-theme='film'] .action,
+html[data-theme='tickets'] .action {
+  font-family: var(--card-font);
+  font-size: 19px;
+  font-weight: 400;
+}
+
+/* The buttons are solid colours here, so a press darkens them instead of lightening. */
+html[data-theme='film'] .action:active,
+html[data-theme='tickets'] .action:active {
+  filter: brightness(0.88);
+}
+
+html[data-theme='film'] .panel h2,
+html[data-theme='tickets'] .panel h2,
+html[data-theme='film'] .menu-panel h2,
+html[data-theme='tickets'] .menu-panel h2 {
+  font-family: var(--card-font);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+html[data-theme='film'] .menu-backdrop,
+html[data-theme='tickets'] .menu-backdrop {
+  background: rgba(0, 0, 0, 0.65);
+}
+
+/* --- Mickey film --- */
+
+html[data-theme='film'] {
+  --card: #f3ead3;
+  --gap-line: rgba(233, 223, 198, 0.4);
+  --felt-dark: #161616;
+}
+
+/* Rays fanning up from the bottom of the screen, like an old title card. */
+html[data-theme='film'] body {
+  background: #161616 repeating-conic-gradient(from 0deg at 50% 100%, #272727 0 5deg, #191919 5deg 10deg);
+}
+
+html[data-theme='film'] .topbar,
+html[data-theme='film'] .icon-button {
+  color: #f3ead3;
+}
+
+html[data-theme='film'] .action {
+  border: 2px solid #000;
+  background: #f3ead3;
+  color: #141414;
+}
+
+html[data-theme='film'] .action.primary,
+html[data-theme='film'] .action.confirming {
+  background: var(--accent);
+}
+
+html[data-theme='film'] .count {
+  background: #141414;
+  color: #f3ead3;
+}
+
+html[data-theme='film'] .panel,
+html[data-theme='film'] .menu-panel {
+  border-color: rgba(233, 223, 198, 0.2);
+  background: #1c1c1c;
+}
+
+/* --- Mickey tickets --- */
+
+html[data-theme='tickets'] {
+  --card: #f6e7b8;
+  --gap-line: rgba(246, 231, 184, 0.55);
+  --felt-dark: #4a0710;
+  /* One light bulb. Rows of them run along the top bar. */
+  --bulb: radial-gradient(circle, #ffd75e 0 2.3px, transparent 2.9px);
+}
+
+/* The folds of a red velvet curtain. */
+html[data-theme='tickets'] body {
+  background: #4a0710 repeating-linear-gradient(90deg, #7a0f1c 0 14px, #5a0a14 14px 22px, #8d1422 22px 36px, #5a0a14 36px 44px);
+}
+
+/* The black of the two bars carries on behind the notch and the home bar. */
+html[data-theme='tickets'] .app {
+  background:
+    linear-gradient(#101010, #101010) top / 100% env(safe-area-inset-top, 0px) no-repeat,
+    linear-gradient(#101010, #101010) bottom / 100% env(safe-area-inset-bottom, 0px) no-repeat;
+}
+
+/*
+ * The cinema's sign: black, with a row of bulbs along its top and bottom edges.
+ * It is 4px shorter than usual and has a 4px gap under it instead, so the
+ * cards don't touch it and the board keeps exactly the same size.
+ */
+html[data-theme='tickets'] .topbar {
+  margin-bottom: 4px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  background:
+    var(--bulb) 0 1px / 13px 7px repeat-x,
+    var(--bulb) 0 calc(100% - 1px) / 13px 7px repeat-x,
+    #101010;
+  color: #ffe9a8;
+}
+
+html[data-theme='tickets'] .icon-button {
+  color: #ffe9a8;
+}
+
+html[data-theme='tickets'] .bottombar {
+  background: #101010;
+}
+
+html[data-theme='tickets'] .action {
+  background: #ffd75e;
+  color: #141414;
+}
+
+/* The buttons are already gold, so the one to press stands out in red instead. */
+html[data-theme='tickets'] .action.primary,
+html[data-theme='tickets'] .action.confirming {
+  background: #d3202f;
+  color: #fff5dc;
+}
+
+html[data-theme='tickets'] .count {
+  background: #141414;
+  color: #ffd75e;
+}
+
+html[data-theme='tickets'] .panel,
+html[data-theme='tickets'] .menu-panel {
+  border-color: rgba(255, 215, 94, 0.3);
+  background: #230408;
 }

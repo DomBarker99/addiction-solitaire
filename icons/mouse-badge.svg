@@ -1,0 +1,22 @@
+<!-- The mouse from mouse.svg on a cream disc, for dark backgrounds: the top bar and the backs of the cards. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="50" fill="#f3ead3" />
+  <g transform="translate(12 10) scale(0.76)">
+    <g fill="#111">
+      <circle cx="50" cy="60" r="31" />
+      <circle cx="21" cy="26" r="18" />
+      <circle cx="79" cy="26" r="18" />
+    </g>
+    <g fill="#f3ead3">
+      <ellipse cx="41" cy="52" rx="10" ry="15" />
+      <ellipse cx="59" cy="52" rx="10" ry="15" />
+      <ellipse cx="50" cy="73" rx="24" ry="14" />
+    </g>
+    <g fill="#111">
+      <ellipse cx="42" cy="54" rx="3.6" ry="7" />
+      <ellipse cx="58" cy="54" rx="3.6" ry="7" />
+      <ellipse cx="50" cy="66" rx="6.5" ry="4.2" />
+    </g>
+    <path d="M33 74q17 13 34 0" fill="none" stroke="#111" stroke-width="2.6" stroke-linecap="round" />
+  </g>
+</svg>

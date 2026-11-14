@@ -171,7 +171,7 @@
       el.className = `card down ${C.isRed(card) ? 'red' : 'black'}`;
       el.dataset.card = card;
       el.innerHTML =
-        `<span class="face"><span class="corner"><span class="rank">${C.rankLabel(card)}</span>` +
+        `<span class="face"><span class="corner"><span class="rank${C.rankOf(card) === 10 ? ' ten' : ''}">${C.rankLabel(card)}</span>` +
         `<svg class="suit" aria-hidden="true"><use href="#suit-${suit}"></use></svg></span>` +
         `<svg class="pip" aria-hidden="true"><use href="#suit-${suit}"></use></svg></span>` +
         '<span class="back"></span>';
